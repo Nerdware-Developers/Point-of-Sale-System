@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h1>POS System Icon Generator</h1>
+  <p>To create icons for the PWA:</p>
+  <ol>
+    <li>Create a 192x192 PNG icon and save as <code>icon-192.png</code></li>
+    <li>Create a 512x512 PNG icon and save as <code>icon-512.png</code></li>
+    <li>Place both files in the <code>public</code> folder</li>
+  </ol>
+  <p>You can use online tools like:</p>
+  <ul>
+    <li><a href="https://www.favicon-generator.org/" target="_blank">Favicon Generator</a></li>
+    <li><a href="https://realfavicongenerator.net/" target="_blank">RealFaviconGenerator</a></li>
+  </ul>
+  <canvas id="icon192" width="192" height="192" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+  <canvas id="icon512" width="512" height="512" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+  <script>
+    // Generate simple placeholder icons
+    function createIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${size / 3}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('POS', size / 2, size / 2);
+    }
+    createIcon(document.getElementById('icon192'), 192);
+    createIcon(document.getElementById('icon512'), 512);
+    
+    // Download functionality
+    function downloadIcon(canvas, filename) {
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+    
+    document.getElementById('icon192').addEventListener('click', () => {
+      downloadIcon(document.getElementById('icon192'), 'icon-192.png');
+    });
+    
+    document.getElementById('icon512').addEventListener('click', () => {
+      downloadIcon(document.getElementById('icon512'), 'icon-512.png');
+    });
+  </script>
+  <p><strong>Click on the icons above to download them.</strong></p>
+</body>
+</html>
+
+

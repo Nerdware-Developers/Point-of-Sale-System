@@ -1,0 +1,14 @@
+{
+  "name": "pos-system",
+  "version": "1.0.0",
+  "description": "Point of Sale System for Small Supermarket",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["pos", "point-of-sale", "supermarket"],
+  "author": "",
+  "license": "MIT"
+}
+
