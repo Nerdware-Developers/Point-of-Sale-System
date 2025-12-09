@@ -31,28 +31,38 @@ export default function Dashboard() {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
 
-      // Fetch products
-      const productsRes = await api.get('/products');
-      const products = productsRes.data;
+      // Fetch all data in parallel with error handling - don't let one failure block everything
+      const [
+        productsRes,
+        salesRes,
+        topProductsRes,
+        recentSalesRes,
+        expiringRes,
+        reorderRes,
+        fastMovingRes,
+        slowMovingRes
+      ] = await Promise.allSettled([
+        api.get('/products').catch(() => ({ data: [] })),
+        api.get('/reports/daily', { params: { date: today } }).catch(() => ({ data: { summary: {} } })),
+        api.get('/reports/top-products', { params: { limit: 5 } }).catch(() => ({ data: [] })),
+        api.get('/sales', { params: { limit: 7 } }).catch(() => ({ data: [] })),
+        api.get('/notifications/expiring', { params: { days: 30 } }).catch(() => ({ data: [] })),
+        api.get('/notifications/reorder').catch(() => ({ data: [] })),
+        api.get('/notifications/fast-moving', { params: { days: 30, limit: 5 } }).catch(() => ({ data: [] })),
+        api.get('/notifications/slow-moving', { params: { days: 90, limit: 5 } }).catch(() => ({ data: [] }))
+      ]);
+
+      // Extract data from settled promises
+      const products = productsRes.status === 'fulfilled' ? productsRes.value.data : [];
+      const dailyReport = salesRes.status === 'fulfilled' ? salesRes.value.data : { summary: {} };
+      const topProducts = topProductsRes.status === 'fulfilled' ? topProductsRes.value.data : [];
+      const recentSales = recentSalesRes.status === 'fulfilled' ? recentSalesRes.value.data : [];
+      const expiring = expiringRes.status === 'fulfilled' ? expiringRes.value.data : [];
+      const reorder = reorderRes.status === 'fulfilled' ? reorderRes.value.data : [];
+      const fastMoving = fastMovingRes.status === 'fulfilled' ? fastMovingRes.value.data : [];
+      const slowMoving = slowMovingRes.status === 'fulfilled' ? slowMovingRes.value.data : [];
+
       const lowStock = products.filter((p) => p.stock_quantity < 10);
-
-      // Fetch today's sales
-      const salesRes = await api.get('/reports/daily', { params: { date: today } });
-      const dailyReport = salesRes.data;
-
-      // Fetch top products
-      const topProductsRes = await api.get('/reports/top-products', { params: { limit: 5 } });
-
-      // Fetch recent sales for chart
-      const recentSalesRes = await api.get('/sales', { params: { limit: 7 } });
-
-      // Fetch expiring products
-      const expiringRes = await api.get('/notifications/expiring', { params: { days: 30 } });
-      
-      // Fetch advanced alerts
-      const reorderRes = await api.get('/notifications/reorder');
-      const fastMovingRes = await api.get('/notifications/fast-moving', { params: { days: 30, limit: 5 } });
-      const slowMovingRes = await api.get('/notifications/slow-moving', { params: { days: 90, limit: 5 } });
 
       setStats({
         totalProducts: products.length,
@@ -61,12 +71,12 @@ export default function Dashboard() {
         lowStockCount: lowStock.length,
       });
 
-      setTopProducts(topProductsRes.data);
+      setTopProducts(topProducts);
       setLowStockProducts(lowStock.slice(0, 5));
-      setExpiringProducts(expiringRes.data.slice(0, 5));
-      setReorderProducts(reorderRes.data.slice(0, 5));
-      setFastMovingProducts(fastMovingRes.data);
-      setSlowMovingProducts(slowMovingRes.data);
+      setExpiringProducts(expiring.slice(0, 5));
+      setReorderProducts(reorder.slice(0, 5));
+      setFastMovingProducts(fastMoving);
+      setSlowMovingProducts(slowMoving);
 
       // Prepare sales chart data (last 7 days)
       const last7Days = [];
@@ -81,7 +91,7 @@ export default function Dashboard() {
       }
 
       // Group sales by date
-      recentSalesRes.data.forEach((sale) => {
+      recentSales.forEach((sale) => {
         const saleDate = new Date(sale.date_time).toISOString().split('T')[0];
         const dayIndex = last7Days.findIndex((d) => {
           const dDate = new Date(d.date);
@@ -94,8 +104,13 @@ export default function Dashboard() {
 
       setSalesData(last7Days);
     } catch (error) {
-      toast.error('Failed to load dashboard data');
-      console.error(error);
+      console.error('Dashboard error:', error);
+      // Show user-friendly error message
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error('Request timed out. The server may be slow or the database is unavailable.');
+      } else {
+        toast.error('Failed to load some dashboard data. Some features may be limited.');
+      }
     } finally {
       setLoading(false);
     }
