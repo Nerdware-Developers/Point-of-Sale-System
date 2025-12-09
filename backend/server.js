@@ -124,22 +124,25 @@ app.get('/api/health/db', async (req, res) => {
       }
     });
   } catch (error) {
+    // Import database config to see what it's actually using
+    const dbConfig = await import('./config/database.js');
     res.status(503).json({ 
       status: 'ERROR', 
       message: 'Database connection failed',
       error: error.message,
       code: error.code,
-      database: {
-        host: process.env.DB_HOST || 'not set',
-        port: process.env.DB_PORT || 'not set',
-        name: process.env.DB_NAME || 'not set',
-        user: process.env.DB_USER || 'not set',
+      environmentVariables: {
+        DB_HOST: process.env.DB_HOST || 'not set',
+        DB_PORT: process.env.DB_PORT || 'not set',
+        DB_NAME: process.env.DB_NAME || 'not set',
+        DB_USER: process.env.DB_USER || 'not set',
         hasPassword: !!process.env.DB_PASSWORD
       },
       troubleshooting: {
         checkSupabase: 'Ensure your Supabase project is active (not paused)',
-        checkEnvVars: 'Verify all DB_* environment variables are set in Render',
-        checkNetwork: 'Check if network/firewall is blocking the connection'
+        checkEnvVars: 'Verify all DB_* environment variables are set correctly in Render',
+        checkNetwork: 'Check if network/firewall is blocking the connection',
+        important: 'DB_HOST should be: db.qnygngzfbvcsfhpttjmg.supabase.co (NOT aws-0-...)'
       }
     });
   }
