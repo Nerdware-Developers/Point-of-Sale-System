@@ -107,6 +107,44 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'POS API is running' });
 });
 
+// Database health check
+app.get('/api/health/db', async (req, res) => {
+  try {
+    const { query } = await import('./config/database.js');
+    await query('SELECT 1');
+    res.json({ 
+      status: 'OK', 
+      message: 'Database connection successful',
+      database: {
+        host: process.env.DB_HOST || 'not set',
+        port: process.env.DB_PORT || 'not set',
+        name: process.env.DB_NAME || 'not set',
+        user: process.env.DB_USER || 'not set',
+        hasPassword: !!process.env.DB_PASSWORD
+      }
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'ERROR', 
+      message: 'Database connection failed',
+      error: error.message,
+      code: error.code,
+      database: {
+        host: process.env.DB_HOST || 'not set',
+        port: process.env.DB_PORT || 'not set',
+        name: process.env.DB_NAME || 'not set',
+        user: process.env.DB_USER || 'not set',
+        hasPassword: !!process.env.DB_PASSWORD
+      },
+      troubleshooting: {
+        checkSupabase: 'Ensure your Supabase project is active (not paused)',
+        checkEnvVars: 'Verify all DB_* environment variables are set in Render',
+        checkNetwork: 'Check if network/firewall is blocking the connection'
+      }
+    });
+  }
+});
+
 // Test login endpoint (for debugging)
 app.post('/api/test-login', async (req, res) => {
   console.log('[Test] Login test endpoint called');
