@@ -5,16 +5,19 @@ import './index.css';
 import offlineDB from './utils/offlineDB.js';
 import offlineSync from './utils/offlineSync.js';
 
-// Initialize offline database
+// Initialize offline database (non-blocking)
 offlineDB.init().then(() => {
   console.log('[Main] Offline database initialized');
   
   // Sync when online
   if (navigator.onLine) {
-    offlineSync.sync();
+    offlineSync.sync().catch(err => {
+      console.error('[Main] Sync error:', err);
+    });
   }
 }).catch(error => {
   console.error('[Main] Failed to initialize offline database:', error);
+  // Don't block app from loading if offline DB fails
 });
 
 // Register service worker
