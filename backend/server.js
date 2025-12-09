@@ -29,12 +29,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Ensure uploads directory exists
+import { existsSync, mkdirSync } from 'fs';
+if (!existsSync('uploads')) {
+  mkdirSync('uploads', { recursive: true });
+}
 app.use('/uploads', express.static('uploads'));
 
-// Initialize database and ensure default users exist
+// Initialize database and ensure default users exist (non-blocking)
 createConnection().then(async () => {
   // Ensure default users exist on startup
   try {
@@ -67,6 +76,8 @@ createConnection().then(async () => {
   } catch (error) {
     console.error('Error ensuring default users:', error.message);
   }
+}).catch((error) => {
+  console.error('Database initialization error (server will continue):', error.message);
 });
 
 // Routes
@@ -103,7 +114,19 @@ app.post('/api/test-login', async (req, res) => {
   res.json({ message: 'Test endpoint reached', body: req.body });
 });
 
+// Error handling for uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit, let the server continue
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit, let the server continue
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
 
