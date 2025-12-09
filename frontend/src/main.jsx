@@ -56,6 +56,8 @@ if ('serviceWorker' in navigator) {
         });
       }
     });
+  }).catch(error => {
+    console.error('[Main] Error getting service worker registrations:', error);
   });
 }
 
