@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_API_URL = "https://point-of-sale-system-1.onrender.com/api"
 
 [[redirects]]
   from = "/*"

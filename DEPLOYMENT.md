@@ -45,8 +45,8 @@
    - **Publish directory:** `frontend/dist`
 5. Add Environment Variable:
    - **Key:** `VITE_API_URL`
-   - **Value:** `https://your-backend-url.onrender.com/api`
-   (Replace with your actual Render backend URL)
+   - **Value:** `https://point-of-sale-system-1.onrender.com/api`
+   (Or you can set this in `netlify.toml` - already configured!)
 6. Click "Deploy site"
 7. Wait for deployment (2-5 minutes)
 8. Your site will be live at `https://your-site-name.netlify.app`
