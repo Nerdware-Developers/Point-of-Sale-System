@@ -6,7 +6,8 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
-    "start": "cd backend && npm start"
+    "start": "cd backend && npm start",
+    "postinstall": "cd backend && npm install"
   },
   "keywords": ["pos", "point-of-sale", "supermarket"],
   "author": "",
