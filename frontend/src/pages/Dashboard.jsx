@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Package, DollarSign, ShoppingCart, AlertTriangle, Clock } from 'lucide-react';
+import { Package, DollarSign, ShoppingCart, AlertTriangle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
@@ -17,6 +17,9 @@ export default function Dashboard() {
   const [topProducts, setTopProducts] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [expiringProducts, setExpiringProducts] = useState([]);
+  const [reorderProducts, setReorderProducts] = useState([]);
+  const [fastMovingProducts, setFastMovingProducts] = useState([]);
+  const [slowMovingProducts, setSlowMovingProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
