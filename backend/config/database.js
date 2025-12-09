@@ -17,6 +17,13 @@ const dbConfig = {
     : false,
 };
 
+// Force IPv4 for Supabase connections to avoid IPv6 connectivity issues
+if (process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co')) {
+  // Use connection string approach or force IPv4
+  // The pg library will use IPv4 if we resolve the hostname to IPv4 first
+  dbConfig.family = 4; // Force IPv4
+}
+
 // Log connection details (for debugging, without password)
 console.log('Database config:', {
   host: dbConfig.host,
