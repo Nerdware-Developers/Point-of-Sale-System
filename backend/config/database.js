@@ -26,7 +26,9 @@ console.log('Database config:', {
   database: dbConfig.database,
   user: dbConfig.user,
   ssl: dbConfig.ssl ? 'enabled' : 'disabled',
-  hasPassword: !!dbConfig.password
+  hasPassword: !!dbConfig.password,
+  isSupabase: isSupabase,
+  usingPooler: dbPort === 6543
 });
 
 const pool = new Pool(dbConfig);
