@@ -9,20 +9,38 @@ const { Pool } = pkg;
 const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
 const dbPort = parseInt(process.env.DB_PORT || (isSupabase ? '6543' : '5432'));
 
-// Log connection info (without password) for debugging
-// IMPORTANT: Use DB_HOST exactly as provided - don't modify it
-const dbHost = process.env.DB_HOST || 'localhost';
+// Get hostname - ensure it's correct (db. not aws-0-)
+let dbHost = process.env.DB_HOST || 'localhost';
+// Fix any aws-0- hostname issues
 if (dbHost.includes('aws-0-')) {
-  console.error('⚠️  WARNING: DB_HOST contains aws-0- which is incorrect. Use db. prefix instead.');
+  console.error('⚠️  FIXING: DB_HOST contains aws-0-, replacing with db. prefix');
+  dbHost = dbHost.replace('aws-0-', 'db.');
+}
+
+// Ensure hostname is correct format for Supabase
+if (isSupabase && !dbHost.startsWith('db.') && !dbHost.startsWith('aws-0-')) {
+  // If it's a Supabase host but missing prefix, add it
+  if (dbHost.includes('.supabase.co')) {
+    const projectRef = dbHost.match(/\.([^.]+)\.supabase\.co/)?.[1];
+    if (projectRef) {
+      dbHost = `db.${projectRef}.supabase.co`;
+      console.log(`✅ Fixed hostname to: ${dbHost}`);
+    }
+  }
 }
 
 const dbConfig = {
-  host: dbHost, // Use hostname exactly as provided in environment variable
+  host: dbHost,
   port: dbPort,
   database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   ssl: isSupabase ? { rejectUnauthorized: false } : false,
+  // Force IPv4 and add connection timeout
+  ...(isSupabase ? {
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+  } : {}),
 };
 
 // Log connection details (for debugging, without password)
