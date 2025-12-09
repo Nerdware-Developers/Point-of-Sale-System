@@ -1,9 +1,15 @@
 import pkg from 'pg';
 import dotenv from 'dotenv';
+import dns from 'dns';
+import { promisify } from 'util';
 
 dotenv.config();
 
+// Force IPv4 resolution globally for Supabase connections
+dns.setDefaultResultOrder('ipv4first');
+
 const { Pool } = pkg;
+const lookup = promisify(dns.lookup);
 
 // For Supabase, use connection pooler (port 6543) which is more reliable
 const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
@@ -52,7 +58,8 @@ console.log('Database config:', {
   ssl: dbConfig.ssl ? 'enabled' : 'disabled',
   hasPassword: !!dbConfig.password,
   isSupabase: isSupabase,
-  usingPooler: dbPort === 6543
+  usingPooler: dbPort === 6543,
+  dnsOrder: 'ipv4first'
 });
 
 const pool = new Pool(dbConfig);
