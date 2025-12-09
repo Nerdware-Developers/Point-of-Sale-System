@@ -13,7 +13,11 @@ router.get('/', authenticate, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Get categories error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error details:', error.message, error.code);
+    res.status(500).json({ 
+      error: error.message || 'Server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -33,14 +37,23 @@ router.post('/', authenticate, authorize('admin'), [
       [name, description || null]
     );
 
-    await auditLog(req.user.id, 'CREATE', 'categories', result.rows[0].id, { name });
+    // Log audit (non-blocking)
+    auditLog(req.user?.id || 1, 'CREATE', 'categories', result.rows[0].id, { name }).catch(err => {
+      console.error('Audit log failed:', err);
+    });
+    
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create category error:', error);
+    console.error('Error details:', error.message, error.code);
     if (error.code === '23505') {
       return res.status(400).json({ error: 'Category already exists' });
     }
-    res.status(500).json({ error: 'Server error' });
+    // Provide more detailed error message
+    res.status(500).json({ 
+      error: error.message || 'Server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
