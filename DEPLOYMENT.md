@@ -12,10 +12,12 @@
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `pos-backend`
-   - **Root Directory:** `backend`
+   - **Root Directory:** `backend` ⚠️ **IMPORTANT: Must be set to `backend`**
    - **Environment:** `Node`
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
+   
+   **Note:** If Root Directory is not set correctly, the deployment will fail. Make sure it's set to `backend` in the Render dashboard settings.
 5. Add Environment Variables:
    ```
    NODE_ENV=production
