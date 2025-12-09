@@ -10,8 +10,14 @@ const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase
 const dbPort = parseInt(process.env.DB_PORT || (isSupabase ? '6543' : '5432'));
 
 // Log connection info (without password) for debugging
+// IMPORTANT: Use DB_HOST exactly as provided - don't modify it
+const dbHost = process.env.DB_HOST || 'localhost';
+if (dbHost.includes('aws-0-')) {
+  console.error('⚠️  WARNING: DB_HOST contains aws-0- which is incorrect. Use db. prefix instead.');
+}
+
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: dbHost, // Use hostname exactly as provided in environment variable
   port: dbPort,
   database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
   user: process.env.DB_USER || 'postgres',
