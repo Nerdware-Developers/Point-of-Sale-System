@@ -5,16 +5,29 @@ dotenv.config();
 
 const { Pool } = pkg;
 
-const pool = new Pool({
+// Log connection info (without password) for debugging
+const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'pos_system',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   ssl: process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co') 
     ? { rejectUnauthorized: false } 
     : false,
+};
+
+// Log connection details (for debugging, without password)
+console.log('Database config:', {
+  host: dbConfig.host,
+  port: dbConfig.port,
+  database: dbConfig.database,
+  user: dbConfig.user,
+  ssl: dbConfig.ssl ? 'enabled' : 'disabled',
+  hasPassword: !!dbConfig.password
 });
+
+const pool = new Pool(dbConfig);
 
 export const query = async (text, params) => {
   try {
@@ -32,15 +45,29 @@ export const getClient = async () => {
 export const createConnection = async () => {
   try {
     const client = await pool.connect();
-    console.log('Database connected successfully');
+    console.log('✅ Database connected successfully');
     client.release();
     await initializeTables();
   } catch (error) {
-    console.error('Database connection error:', error.message);
-    console.error('\n⚠️  PostgreSQL is not running or not installed!');
-    console.error('Please install PostgreSQL from: https://www.postgresql.org/download/windows/');
-    console.error('Or start the PostgreSQL service if it\'s already installed.');
-    console.error('\nThe server will continue running but database operations will fail.\n');
+    console.error('❌ Database connection error:', error.message);
+    console.error('Error code:', error.code);
+    console.error('\n⚠️  Database connection failed!');
+    
+    // Provide helpful error messages based on error type
+    if (error.code === 'ENOTFOUND' || error.code === 'ENETUNREACH') {
+      console.error('Possible causes:');
+      console.error('  1. Supabase project is paused - check https://supabase.com/dashboard');
+      console.error('  2. Incorrect DB_HOST in environment variables');
+      console.error('  3. Network/firewall blocking connection');
+      console.error(`  Current DB_HOST: ${process.env.DB_HOST || 'not set'}`);
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('Connection refused - check DB_PORT and ensure database is accessible');
+    } else if (error.code === '28P01') {
+      console.error('Authentication failed - check DB_USER and DB_PASSWORD');
+    }
+    
+    console.error('\nThe server will continue running but database operations will fail.');
+    console.error('Check your Render environment variables and Supabase project status.\n');
   }
 };
 
