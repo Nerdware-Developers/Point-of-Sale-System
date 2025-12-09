@@ -6,29 +6,18 @@ dotenv.config();
 const { Pool } = pkg;
 
 // For Supabase, use connection pooler (port 6543) which is more reliable
-// Or use direct connection with IPv4 workaround
 const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
-const usePooler = process.env.DB_USE_POOLER !== 'false'; // Default to true for Supabase
+const dbPort = parseInt(process.env.DB_PORT || (isSupabase ? '6543' : '5432'));
 
 // Log connection info (without password) for debugging
-const dbConfig = isSupabase && usePooler
-  ? {
-      // Use Supabase connection pooler (more reliable, supports IPv4/IPv6)
-      host: process.env.DB_HOST?.replace('db.', 'aws-0-') || process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '6543'), // Pooler uses port 6543
-      database: process.env.DB_NAME || 'postgres',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      ssl: { rejectUnauthorized: false },
-    }
-  : {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'pos_system',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      ssl: isSupabase ? { rejectUnauthorized: false } : false,
-    };
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  port: dbPort,
+  database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  ssl: isSupabase ? { rejectUnauthorized: false } : false,
+};
 
 // Log connection details (for debugging, without password)
 console.log('Database config:', {
