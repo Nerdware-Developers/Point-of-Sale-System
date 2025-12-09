@@ -271,6 +271,85 @@ const initializeTables = async () => {
     ADD COLUMN IF NOT EXISTS reorder_level INTEGER DEFAULT 10
   `);
 
+  // Add wholesale price support
+  await query(`
+    ALTER TABLE products 
+    ADD COLUMN IF NOT EXISTS wholesale_price DECIMAL(10, 2)
+  `);
+
+  // Add sale type to sales table (wholesale/retail)
+  await query(`
+    ALTER TABLE sales 
+    ADD COLUMN IF NOT EXISTS sale_type VARCHAR(20) DEFAULT 'retail'
+  `);
+
+  // Credit Sales and Debt Tracking
+  await query(`
+    CREATE TABLE IF NOT EXISTS credit_sales (
+      id SERIAL PRIMARY KEY,
+      sale_id VARCHAR(50) UNIQUE NOT NULL,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+      total_amount DECIMAL(10, 2) NOT NULL,
+      paid_amount DECIMAL(10, 2) DEFAULT 0,
+      balance DECIMAL(10, 2) NOT NULL,
+      due_date DATE,
+      status VARCHAR(20) DEFAULT 'pending',
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS debt_payments (
+      id SERIAL PRIMARY KEY,
+      credit_sale_id INTEGER REFERENCES credit_sales(id) ON DELETE CASCADE,
+      amount DECIMAL(10, 2) NOT NULL,
+      payment_method VARCHAR(50) DEFAULT 'cash',
+      payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Daily Closing Reports
+  await query(`
+    CREATE TABLE IF NOT EXISTS daily_closings (
+      id SERIAL PRIMARY KEY,
+      closing_date DATE UNIQUE NOT NULL,
+      opening_cash DECIMAL(10, 2) DEFAULT 0,
+      closing_cash DECIMAL(10, 2) DEFAULT 0,
+      cash_sales DECIMAL(10, 2) DEFAULT 0,
+      card_sales DECIMAL(10, 2) DEFAULT 0,
+      mobile_sales DECIMAL(10, 2) DEFAULT 0,
+      total_sales DECIMAL(10, 2) DEFAULT 0,
+      total_expenses DECIMAL(10, 2) DEFAULT 0,
+      cash_difference DECIMAL(10, 2) DEFAULT 0,
+      notes TEXT,
+      closed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Product Movement Tracking
+  await query(`
+    ALTER TABLE products 
+    ADD COLUMN IF NOT EXISTS reorder_level INTEGER DEFAULT 10,
+    ADD COLUMN IF NOT EXISTS fast_moving_threshold INTEGER DEFAULT 50,
+    ADD COLUMN IF NOT EXISTS last_sold_date DATE,
+    ADD COLUMN IF NOT EXISTS total_sold_quantity INTEGER DEFAULT 0
+  `);
+
+  // Add unit management support for bulk/unit sales
+  await query(`
+    ALTER TABLE products 
+    ADD COLUMN IF NOT EXISTS unit_type VARCHAR(50) DEFAULT 'piece',
+    ADD COLUMN IF NOT EXISTS base_unit VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS units_per_bulk DECIMAL(10, 2),
+    ADD COLUMN IF NOT EXISTS bulk_price DECIMAL(10, 2),
+    ADD COLUMN IF NOT EXISTS unit_price DECIMAL(10, 2)
+  `);
+
   // Create indexes
   await query(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);

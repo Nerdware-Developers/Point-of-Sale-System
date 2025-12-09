@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -146,7 +147,7 @@ export default function Expenses() {
             <DollarSign className="w-8 h-8 text-red-600" />
             <div>
               <p className="text-gray-600">Total Expenses</p>
-              <p className="text-3xl font-bold text-red-600">${totalExpenses.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
             </div>
           </div>
         </div>
@@ -174,7 +175,7 @@ export default function Expenses() {
                 <td className="px-6 py-4">{expense.description}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{expense.category || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap font-bold text-red-600">
-                  ${parseFloat(expense.amount).toFixed(2)}
+                  {formatCurrency(expense.amount)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">{expense.created_by_name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">

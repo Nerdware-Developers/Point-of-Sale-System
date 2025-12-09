@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Search, Receipt, Calendar } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -104,7 +105,7 @@ export default function Sales() {
                   <td className="px-6 py-4 whitespace-nowrap">{sale.cashier_name || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{items.length} items</td>
                   <td className="px-6 py-4 whitespace-nowrap font-bold text-green-600">
-                    ${parseFloat(sale.total_amount).toFixed(2)}
+                    {formatCurrency(sale.total_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap capitalize">{sale.payment_method}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -160,7 +161,7 @@ export default function Sales() {
                 return items.map((item, index) => (
                   <div key={index} className="flex justify-between mb-2">
                     <span>{item.name} x{item.quantity}</span>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    <span>{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ));
               })()}
@@ -169,23 +170,23 @@ export default function Sales() {
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>${parseFloat(selectedSale.subtotal).toFixed(2)}</span>
+                <span>{formatCurrency(selectedSale.subtotal)}</span>
               </div>
               {selectedSale.tax > 0 && (
                 <div className="flex justify-between">
                   <span>Tax:</span>
-                  <span>${parseFloat(selectedSale.tax).toFixed(2)}</span>
+                  <span>{formatCurrency(selectedSale.tax)}</span>
                 </div>
               )}
               {selectedSale.discount > 0 && (
                 <div className="flex justify-between text-red-600">
                   <span>Discount:</span>
-                  <span>-${parseFloat(selectedSale.discount).toFixed(2)}</span>
+                  <span>-{formatCurrency(selectedSale.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-lg border-t pt-2">
                 <span>Total:</span>
-                <span>${parseFloat(selectedSale.total_amount).toFixed(2)}</span>
+                <span>{formatCurrency(selectedSale.total_amount)}</span>
               </div>
             </div>
 

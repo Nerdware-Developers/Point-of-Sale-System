@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Plus, Edit, Trash2, Search, Package, ScanLine, Download } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 
 export default function Products() {
@@ -15,11 +16,17 @@ export default function Products() {
     category_id: '',
     buying_price: '',
     selling_price: '',
+    wholesale_price: '',
     stock_quantity: '',
     barcode: '',
     supplier_id: '',
     expiry_date: '',
     image_url: '',
+    unit_type: 'piece',
+    base_unit: '',
+    units_per_bulk: '',
+    bulk_price: '',
+    unit_price: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -63,16 +70,16 @@ export default function Products() {
 
   // Check if barcode already exists
   const checkBarcodeExists = (barcode) => {
-    if (!barcode) return false;
-    return products.some(p => p.barcode === barcode && p.id !== editingProduct?.id);
+    if (!barcode || !barcode.trim()) return false;
+    return products.some(p => p.barcode && p.barcode === barcode.trim() && p.id !== editingProduct?.id);
   };
 
   // Handle barcode scan
   const handleBarcodeScan = (barcode) => {
-    if (!barcode.trim()) return;
+    if (!barcode || !barcode.trim()) return;
 
     // Check if product with this barcode already exists
-    const existingProduct = products.find(p => p.barcode === barcode.trim());
+    const existingProduct = products.find(p => p.barcode && p.barcode === barcode.trim());
     
     if (existingProduct && !editingProduct) {
       toast.error(`Product with barcode ${barcode} already exists: ${existingProduct.name}`);
@@ -99,18 +106,83 @@ export default function Products() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check for duplicate barcode
-    if (formData.barcode && checkBarcodeExists(formData.barcode)) {
+    // Check for duplicate barcode (only if barcode is provided)
+    if (formData.barcode && formData.barcode.trim() && checkBarcodeExists(formData.barcode.trim())) {
       toast.error('A product with this barcode already exists');
       return;
     }
 
     try {
+      // Validate required fields
+      if (!formData.name || !formData.name.trim()) {
+        toast.error('Product name is required');
+        return;
+      }
+      
+      const buyingPrice = parseFloat(formData.buying_price);
+      const sellingPrice = parseFloat(formData.selling_price);
+      const wholesalePrice = formData.wholesale_price ? parseFloat(formData.wholesale_price) : null;
+      const stockQuantity = parseInt(formData.stock_quantity);
+      const unitsPerBulk = formData.units_per_bulk ? parseFloat(formData.units_per_bulk) : null;
+      const bulkPrice = formData.bulk_price ? parseFloat(formData.bulk_price) : null;
+      const unitPrice = formData.unit_price ? parseFloat(formData.unit_price) : null;
+
+      if (isNaN(buyingPrice) || buyingPrice < 0) {
+        toast.error('Valid buying price is required');
+        return;
+      }
+
+      if (isNaN(sellingPrice) || sellingPrice < 0) {
+        toast.error('Valid selling price is required');
+        return;
+      }
+
+      if (wholesalePrice !== null && (isNaN(wholesalePrice) || wholesalePrice < 0)) {
+        toast.error('Valid wholesale price is required (or leave empty)');
+        return;
+      }
+
+      if (isNaN(stockQuantity) || stockQuantity < 0) {
+        toast.error('Valid stock quantity is required');
+        return;
+      }
+
+      // Validate bulk/unit pricing if base unit is provided
+      if (formData.base_unit && formData.base_unit.trim()) {
+        if (!unitsPerBulk || unitsPerBulk <= 0) {
+          toast.error('Units per bulk is required when base unit is specified');
+          return;
+        }
+        if ((!bulkPrice || bulkPrice < 0) && (!unitPrice || unitPrice < 0)) {
+          toast.error('Either bulk price or unit price (or both) must be provided when base unit is specified');
+          return;
+        }
+      }
+
+      // Prepare data with proper types and handle empty strings
+      const submitData = {
+        name: formData.name.trim(),
+        buying_price: buyingPrice,
+        selling_price: sellingPrice,
+        wholesale_price: wholesalePrice,
+        stock_quantity: stockQuantity,
+        category_id: formData.category_id || null,
+        supplier_id: formData.supplier_id || null,
+        barcode: formData.barcode && formData.barcode.trim() ? formData.barcode.trim() : null,
+        expiry_date: formData.expiry_date || null,
+        image_url: formData.image_url || null,
+        unit_type: formData.unit_type || 'piece',
+        base_unit: formData.base_unit && formData.base_unit.trim() ? formData.base_unit.trim() : null,
+        units_per_bulk: unitsPerBulk,
+        bulk_price: bulkPrice,
+        unit_price: unitPrice,
+      };
+
       if (editingProduct) {
-        await api.put(`/products/${editingProduct.id}`, formData);
+        await api.put(`/products/${editingProduct.id}`, submitData);
         toast.success('Product updated successfully');
       } else {
-        await api.post('/products', formData);
+        await api.post('/products', submitData);
         toast.success('Product created successfully');
       }
       setShowModal(false);
@@ -124,10 +196,30 @@ export default function Products() {
         barcode: '',
         supplier_id: '',
         expiry_date: '',
+        image_url: '',
       });
       fetchProducts();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Operation failed');
+      console.error('Product submit error:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // Handle different error response formats
+      let errorMessage = 'Operation failed';
+      
+      if (error.response?.data) {
+        if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          // Handle validation errors array
+          errorMessage = error.response.data.errors.map(err => err.msg || err.message).join(', ');
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -138,11 +230,17 @@ export default function Products() {
       category_id: product.category_id || '',
       buying_price: product.buying_price,
       selling_price: product.selling_price,
+      wholesale_price: product.wholesale_price || '',
       stock_quantity: product.stock_quantity,
       barcode: product.barcode || '',
       supplier_id: product.supplier_id || '',
       expiry_date: product.expiry_date || '',
       image_url: product.image_url || '',
+      unit_type: product.unit_type || 'piece',
+      base_unit: product.base_unit || '',
+      units_per_bulk: product.units_per_bulk || '',
+      bulk_price: product.bulk_price || '',
+      unit_price: product.unit_price || '',
     });
     setShowModal(true);
     // Focus barcode input when editing
@@ -160,6 +258,44 @@ export default function Products() {
       fetchProducts();
     } catch (error) {
       toast.error('Failed to delete product');
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const uploadFormData = new FormData();
+      uploadFormData.append('image', file);
+
+      const response = await api.post('/upload/product-image', uploadFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // Update form data with image URL while preserving all other fields
+      setFormData(prevFormData => ({ ...prevFormData, image_url: response.data.imageUrl }));
+      toast.success('Image uploaded successfully');
+    } catch (error) {
+      toast.error('Failed to upload image');
+      console.error('Upload error:', error);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -184,10 +320,16 @@ export default function Products() {
               category_id: '',
               buying_price: '',
               selling_price: '',
+              wholesale_price: '',
               stock_quantity: '',
               barcode: '',
               supplier_id: '',
               expiry_date: '',
+              unit_type: 'piece',
+              base_unit: '',
+              units_per_bulk: '',
+              bulk_price: '',
+              unit_price: '',
             });
             setShowModal(true);
             // Auto-focus barcode input when modal opens
@@ -225,7 +367,8 @@ export default function Products() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buying Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Selling Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retail Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Wholesale Price</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -249,8 +392,11 @@ export default function Products() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600">{product.category_name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-mono text-sm">{product.barcode}</td>
-                <td className="px-6 py-4 whitespace-nowrap">${parseFloat(product.buying_price).toFixed(2)}</td>
-                <td className="px-6 py-4 whitespace-nowrap font-semibold">${parseFloat(product.selling_price).toFixed(2)}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(product.buying_price)}</td>
+                <td className="px-6 py-4 whitespace-nowrap font-semibold">{formatCurrency(product.selling_price)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                  {product.wholesale_price ? formatCurrency(product.wholesale_price) : 'N/A'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 rounded text-sm font-semibold ${
                     product.stock_quantity < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
@@ -293,7 +439,7 @@ export default function Products() {
               <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
                   <ScanLine className="w-5 h-5 text-blue-600" />
-                  <label className="block text-sm font-semibold text-blue-600">Scan Barcode</label>
+                  <label className="block text-sm font-semibold text-blue-600">Scan Barcode (Optional)</label>
                 </div>
                 <input
                   ref={barcodeInputRef}
@@ -307,7 +453,7 @@ export default function Products() {
                       handleBarcodeScan(formData.barcode);
                     }
                   }}
-                  placeholder="Scan barcode with scanner or type manually..."
+                  placeholder="Scan barcode with scanner or type manually (optional)..."
                   className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-mono ${
                     isScanning ? 'border-green-500 bg-green-50' : 'border-blue-300'
                   }`}
@@ -335,13 +481,13 @@ export default function Products() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Barcode (Manual Entry)</label>
+                  <label className="block text-sm font-medium mb-1">Barcode (Optional)</label>
                   <input
                     type="text"
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded font-mono"
-                    placeholder="Or type barcode here"
+                    placeholder="Type barcode here (optional)"
                   />
                 </div>
               </div>
@@ -379,28 +525,41 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Buying Price *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.buying_price}
-                    onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Selling Price *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                    required
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Buying Price *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.buying_price}
+                      onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Retail Price *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.selling_price}
+                      onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Wholesale Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.wholesale_price}
+                      onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="Optional"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
@@ -412,6 +571,67 @@ export default function Products() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Bulk/Unit Configuration */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-lg font-semibold mb-3">Bulk/Unit Sales Configuration (Optional)</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Configure if this product can be sold in bulk (e.g., 20L container) or per unit (e.g., per liter)
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Base Unit (e.g., "liter", "packet", "kg")</label>
+                    <input
+                      type="text"
+                      value={formData.base_unit}
+                      onChange={(e) => setFormData({ ...formData, base_unit: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="e.g., liter, packet, kg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Units Per Bulk</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.units_per_bulk}
+                      onChange={(e) => setFormData({ ...formData, units_per_bulk: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="e.g., 20 (for 20L container)"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">How many units in one bulk item</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Bulk Price (Price for entire bulk)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.bulk_price}
+                      onChange={(e) => setFormData({ ...formData, bulk_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="e.g., 5000 (for 20L container)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Unit Price (Price per unit)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.unit_price}
+                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="e.g., 250 (per liter)"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Example: Cooking oil - Base unit: "liter", Units per bulk: 20, Bulk price: 5000, Unit price: 250
+                </p>
               </div>
 
               <div>

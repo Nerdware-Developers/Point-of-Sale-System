@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Search, Plus, Minus, Trash2, Receipt, X, ScanLine, Save, RotateCcw, User, Star } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 
 export default function Checkout() {
   const { user } = useAuth();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
+  const [saleType, setSaleType] = useState('retail'); // 'retail' or 'wholesale'
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
   const [cashGiven, setCashGiven] = useState('');
@@ -23,18 +27,98 @@ export default function Checkout() {
   const [heldTransactions, setHeldTransactions] = useState([]);
   const [showHeldModal, setShowHeldModal] = useState(false);
   const [quickProducts, setQuickProducts] = useState([]);
+  const [isCreditSale, setIsCreditSale] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
   const searchInputRef = useRef(null);
   const barcodeTimeoutRef = useRef(null);
+
+  const addToCart = (product, saleUnit = 'bulk') => {
+    setCart((currentCart) => {
+      // Check if product has bulk/unit configuration
+      const hasBulkUnit = product.base_unit && product.units_per_bulk;
+      
+      // Determine price based on sale type and unit
+      let price = saleType === 'wholesale' && product.wholesale_price 
+        ? product.wholesale_price 
+        : product.selling_price;
+
+      // Override with bulk/unit pricing if configured
+      if (hasBulkUnit) {
+        if (saleUnit === 'bulk' && product.bulk_price) {
+          price = product.bulk_price;
+        } else if (saleUnit === 'unit' && product.unit_price) {
+          price = product.unit_price;
+        }
+      }
+
+      // Calculate stock check based on unit type
+      let availableStock = product.stock_quantity;
+      if (hasBulkUnit && saleUnit === 'unit') {
+        // If selling per unit, check if we have enough units
+        availableStock = product.stock_quantity * product.units_per_bulk;
+      }
+
+      const existingItem = currentCart.find((item) => 
+        item.id === product.id && item.saleUnit === saleUnit
+      );
+
+      if (existingItem) {
+        const currentQty = existingItem.quantity;
+        const maxQty = hasBulkUnit && saleUnit === 'unit' 
+          ? product.stock_quantity * product.units_per_bulk 
+          : product.stock_quantity;
+        
+        if (currentQty >= maxQty) {
+          toast.error('Insufficient stock');
+          return currentCart;
+        }
+        return currentCart.map((item) =>
+          item.id === product.id && item.saleUnit === saleUnit
+            ? { ...item, quantity: item.quantity + 1, price }
+            : item
+        );
+      } else {
+        if (availableStock <= 0) {
+          toast.error('Product out of stock');
+          return currentCart;
+        }
+        return [...currentCart, { 
+          ...product, 
+          quantity: 1, 
+          price,
+          saleUnit: hasBulkUnit ? saleUnit : 'piece',
+          displayName: hasBulkUnit 
+            ? `${product.name} (${saleUnit === 'bulk' ? 'Bulk' : `Per ${product.base_unit}`})`
+            : product.name
+        }];
+      }
+    });
+  };
 
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
     fetchHeldTransactions();
+    
     // Auto-focus search input on mount
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 100);
   }, []);
+
+  // Handle product selection from Shop page
+  useEffect(() => {
+    if (location.state?.selectedProduct) {
+      const selectedProduct = location.state.selectedProduct;
+      // Clear the state first to avoid re-adding on re-render
+      window.history.replaceState({}, document.title);
+      // Add to cart after a small delay to ensure state is cleared
+      setTimeout(() => {
+        addToCart(selectedProduct);
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   useEffect(() => {
     // Get top selling products for quick buttons
@@ -143,8 +227,23 @@ export default function Checkout() {
       setIsScanning(true);
       setTimeout(() => setIsScanning(false), 300);
       
-      addToCart(foundProduct);
-      toast.success(`Added: ${foundProduct.name}`, { duration: 1000 });
+      // Check if product has bulk/unit options
+      const hasBulkUnit = foundProduct.base_unit && foundProduct.units_per_bulk;
+      
+      if (hasBulkUnit) {
+        // Show options for bulk or unit
+        const useBulk = window.confirm(
+          `${foundProduct.name}\n\n` +
+          `Bulk: ${formatCurrency(foundProduct.bulk_price || foundProduct.selling_price)} (${foundProduct.units_per_bulk} ${foundProduct.base_unit})\n` +
+          `Per ${foundProduct.base_unit}: ${formatCurrency(foundProduct.unit_price || foundProduct.selling_price / foundProduct.units_per_bulk)}\n\n` +
+          `Click OK for Bulk, Cancel for Per ${foundProduct.base_unit}`
+        );
+        addToCart(foundProduct, useBulk ? 'bulk' : 'unit');
+        toast.success(`Added: ${foundProduct.name} (${useBulk ? 'Bulk' : `Per ${foundProduct.base_unit}`})`, { duration: 1000 });
+      } else {
+        addToCart(foundProduct, 'piece');
+        toast.success(`Added: ${foundProduct.name}`, { duration: 1000 });
+      }
       setSearchQuery('');
       
       // Auto-focus for next scan
@@ -158,38 +257,22 @@ export default function Checkout() {
     }
   };
 
-  const addToCart = (product) => {
-    const existingItem = cart.find((item) => item.id === product.id);
-
-    if (existingItem) {
-      if (existingItem.quantity >= product.stock_quantity) {
-        toast.error('Insufficient stock');
-        return;
-      }
-      setCart(
-        cart.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
-    } else {
-      if (product.stock_quantity <= 0) {
-        toast.error('Product out of stock');
-        return;
-      }
-      setCart([...cart, { ...product, quantity: 1 }]);
-    }
-  };
-
-  const updateQuantity = (id, change) => {
+  const updateQuantity = (id, change, saleUnit = 'piece') => {
     setCart(
       cart
         .map((item) => {
-          if (item.id === id) {
+          if (item.id === id && (item.saleUnit || 'piece') === saleUnit) {
             const newQuantity = item.quantity + change;
             if (newQuantity <= 0) return null;
-            if (newQuantity > item.stock_quantity) {
+            
+            // Check stock based on unit type
+            const hasBulkUnit = item.base_unit && item.units_per_bulk;
+            let maxQty = item.stock_quantity;
+            if (hasBulkUnit && saleUnit === 'unit') {
+              maxQty = item.stock_quantity * item.units_per_bulk;
+            }
+            
+            if (newQuantity > maxQty) {
               toast.error('Insufficient stock');
               return item;
             }
@@ -201,17 +284,22 @@ export default function Checkout() {
     );
   };
 
-  const removeFromCart = (id) => {
-    setCart(cart.filter((item) => item.id !== id));
+  const removeFromCart = (id, saleUnit = 'piece') => {
+    setCart(cart.filter((item) => !(item.id === id && (item.saleUnit || 'piece') === saleUnit)));
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.selling_price * item.quantity, 0);
-  const taxAmount = (subtotal * tax) / 100;
-  const discountAmount = (subtotal * discount) / 100;
+  // Safely calculate totals with null checks - use price from cart item (already set based on sale type)
+  const subtotal = (cart || []).reduce((sum, item) => {
+    const price = parseFloat(item?.price || item?.selling_price || 0);
+    const qty = parseInt(item?.quantity || 0);
+    return sum + (price * qty);
+  }, 0);
+  const taxAmount = (subtotal * (parseFloat(tax) || 0)) / 100;
+  const discountAmount = (subtotal * (parseFloat(discount) || 0)) / 100;
   const total = subtotal + taxAmount - discountAmount;
   
   // Calculate payment totals
-  const paymentTotal = paymentMethods.reduce((sum, pm) => sum + parseFloat(pm.amount || 0), 0);
+  const paymentTotal = (paymentMethods || []).reduce((sum, pm) => sum + parseFloat(pm?.amount || 0), 0);
   const remaining = total - paymentTotal;
   const change = paymentMethod === 'cash' && cashGiven ? parseFloat(cashGiven) - remaining : 0;
 
@@ -275,23 +363,35 @@ export default function Checkout() {
       return;
     }
 
-    // Check payment methods
-    if (paymentMethods.length > 0) {
+    // If credit sale, show customer selection modal
+    if (isCreditSale && !selectedCustomer) {
+      toast.error('Please select a customer for credit sale');
+      setShowCreditModal(true);
+      return;
+    }
+
+    // Check payment methods (skip for credit sales)
+    if (!isCreditSale) {
+      if (paymentMethods.length > 0) {
       if (paymentTotal < total) {
         toast.error('Payment amount is less than total');
         return;
       }
-    } else if (paymentMethod === 'cash' && (!cashGiven || parseFloat(cashGiven) < total)) {
-      toast.error('Insufficient cash');
-      return;
+      } else if (paymentMethod === 'cash' && (!cashGiven || parseFloat(cashGiven) < total)) {
+        toast.error('Insufficient cash');
+        return;
+      }
     }
 
     try {
       const items = cart.map((item) => ({
         product_id: item.id,
-        name: item.name,
+        name: item.displayName || item.name,
         quantity: item.quantity,
-        price: item.selling_price,
+        price: item.price || item.selling_price,
+        sale_unit: item.saleUnit || 'piece',
+        base_unit: item.base_unit || null,
+        units_per_bulk: item.units_per_bulk || null,
       }));
 
       // Prepare payment methods array
@@ -308,6 +408,7 @@ export default function Checkout() {
         payment_method: paymentMethod,
         payment_methods: finalPaymentMethods,
         customer_id: selectedCustomer?.id || null,
+        sale_type: saleType,
         cash_given: paymentMethod === 'cash' ? parseFloat(cashGiven) : null,
         change_returned: change > 0 ? change : null,
         sale_id: `SALE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -316,6 +417,23 @@ export default function Checkout() {
 
       const response = await api.post('/sales', saleData);
       const saleResponse = response.data;
+
+      // If credit sale, create credit sale record
+      if (isCreditSale && selectedCustomer) {
+        try {
+          await api.post('/credit-sales', {
+            sale_id: saleResponse.sale_id,
+            customer_id: selectedCustomer.id,
+            total_amount: total,
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+            notes: `Credit sale - ${saleType}`
+          });
+          toast.success('Credit sale recorded. Customer owes ' + formatCurrency(total));
+        } catch (error) {
+          console.error('Failed to create credit sale:', error);
+          toast.error('Sale completed but failed to record credit');
+        }
+      }
 
       // Save to offline DB if offline
       if (response.data.offline || !navigator.onLine) {
@@ -331,6 +449,7 @@ export default function Checkout() {
       setTax(0);
       setPaymentMethods([]);
       setCashGiven('');
+      setIsCreditSale(false);
       setSelectedCustomer(null);
       setSearchQuery('');
       toast.success('Sale completed successfully!');
@@ -369,9 +488,53 @@ export default function Checkout() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Product Search & Cart */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Customer Selection & Held Transactions */}
+          {/* Sale Type, Customer Selection & Held Transactions */}
           <div className="bg-white p-4 rounded-lg shadow-md">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Sale Type</label>
+                <select
+                  value={saleType}
+                  onChange={(e) => {
+                    setSaleType(e.target.value);
+                    // Recalculate cart prices when switching
+                    setCart(cart.map(item => ({
+                      ...item,
+                      price: e.target.value === 'wholesale' && item.wholesale_price 
+                        ? item.wholesale_price 
+                        : item.selling_price
+                    })));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded"
+                >
+                  <option value="retail">Retail</option>
+                  <option value="wholesale">Wholesale</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Payment Type</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={isCreditSale}
+                      onChange={(e) => {
+                        setIsCreditSale(e.target.checked);
+                        if (e.target.checked && !selectedCustomer) {
+                          setShowCreditModal(true);
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Credit Sale</span>
+                  </label>
+                </div>
+                {isCreditSale && selectedCustomer && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Customer: {selectedCustomer.name}
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Customer (Optional)</label>
                 <div className="flex gap-2">
@@ -421,7 +584,7 @@ export default function Checkout() {
                     className="p-3 bg-blue-50 hover:bg-blue-100 rounded-lg border-2 border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <p className="font-semibold text-sm truncate">{product.name}</p>
-                    <p className="text-xs text-gray-600">${product.selling_price.toFixed(2)}</p>
+                    <p className="text-xs text-gray-600">{formatCurrency(product.selling_price)}</p>
                   </button>
                 ))}
               </div>
@@ -474,34 +637,36 @@ export default function Checkout() {
               <p className="text-gray-500 text-center py-8">Cart is empty</p>
             ) : (
               <div className="space-y-3">
-                {cart.map((item) => (
+                {cart.map((item, index) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${item.saleUnit}-${index}`}
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                   >
                     <div className="flex-1">
-                      <p className="font-semibold text-lg">{item.name}</p>
-                      <p className="text-gray-600">${item.selling_price.toFixed(2)} each</p>
+                      <p className="font-semibold text-lg">{item.displayName || item.name}</p>
+                      <p className="text-gray-600">
+                        {formatCurrency(item.price)} {item.saleUnit === 'unit' && item.base_unit ? `per ${item.base_unit}` : 'each'}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => updateQuantity(item.id, -1)}
+                        onClick={() => updateQuantity(item.id, -1, item.saleUnit)}
                         className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
                       <span className="text-xl font-bold w-12 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.id, 1)}
+                        onClick={() => updateQuantity(item.id, 1, item.saleUnit)}
                         className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
                       <span className="text-xl font-bold w-24 text-right">
-                        ${(item.selling_price * item.quantity).toFixed(2)}
+                        {formatCurrency(item.price * item.quantity)}
                       </span>
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item.id, item.saleUnit)}
                         className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 ml-2"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -521,7 +686,7 @@ export default function Checkout() {
           <div className="space-y-4 mb-6">
             <div className="flex justify-between text-lg">
               <span>Subtotal:</span>
-              <span className="font-semibold">${subtotal.toFixed(2)}</span>
+              <span className="font-semibold">{formatCurrency(subtotal)}</span>
             </div>
 
             <div>
@@ -551,21 +716,21 @@ export default function Checkout() {
             {taxAmount > 0 && (
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Tax:</span>
-                <span>${taxAmount.toFixed(2)}</span>
+                <span>{formatCurrency(taxAmount)}</span>
               </div>
             )}
 
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm text-red-600">
                 <span>Discount:</span>
-                <span>-${discountAmount.toFixed(2)}</span>
+                <span>-{formatCurrency(discountAmount)}</span>
               </div>
             )}
 
             <div className="border-t pt-4">
               <div className="flex justify-between text-2xl font-bold">
                 <span>Total:</span>
-                <span className="text-blue-600">${total.toFixed(2)}</span>
+                <span className="text-blue-600">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>
@@ -606,7 +771,7 @@ export default function Checkout() {
                       min="0"
                     />
                     {change > 0 && (
-                      <p className="mt-2 text-green-600 font-semibold">Change: ${change.toFixed(2)}</p>
+                      <p className="mt-2 text-green-600 font-semibold">Change: {formatCurrency(change)}</p>
                     )}
                   </div>
                 )}
@@ -651,10 +816,10 @@ export default function Checkout() {
                   </div>
                 ))}
                 {paymentTotal < total && (
-                  <p className="text-sm text-red-600">Remaining: ${remaining.toFixed(2)}</p>
+                  <p className="text-sm text-red-600">Remaining: {formatCurrency(remaining)}</p>
                 )}
                 {paymentTotal > total && (
-                  <p className="text-sm text-green-600">Change: ${(paymentTotal - total).toFixed(2)}</p>
+                  <p className="text-sm text-green-600">Change: {formatCurrency(paymentTotal - total)}</p>
                 )}
               </div>
             )}
@@ -671,11 +836,14 @@ export default function Checkout() {
             </button>
             <button
               onClick={handleCheckout}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || (isCreditSale && !selectedCustomer)}
               className="flex-1 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Complete Sale
+              {isCreditSale ? 'Complete Credit Sale' : 'Complete Sale'}
             </button>
+            {isCreditSale && !selectedCustomer && (
+              <p className="text-xs text-red-600 mt-1 text-center">Please select a customer for credit sale</p>
+            )}
           </div>
         </div>
       </div>
@@ -699,30 +867,30 @@ export default function Checkout() {
               {JSON.parse(lastSale.items).map((item, index) => (
                 <div key={index} className="flex justify-between mb-2">
                   <span>{item.name} x{item.quantity}</span>
-                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  <span>{formatCurrency(item.price * item.quantity)}</span>
                 </div>
               ))}
             </div>
             <div className="space-y-2 mb-4">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>${parseFloat(lastSale.subtotal).toFixed(2)}</span>
+                <span>{formatCurrency(lastSale.subtotal)}</span>
               </div>
               {lastSale.tax > 0 && (
                 <div className="flex justify-between">
                   <span>Tax:</span>
-                  <span>${parseFloat(lastSale.tax).toFixed(2)}</span>
+                  <span>{formatCurrency(lastSale.tax)}</span>
                 </div>
               )}
               {lastSale.discount > 0 && (
                 <div className="flex justify-between text-red-600">
                   <span>Discount:</span>
-                  <span>-${parseFloat(lastSale.discount).toFixed(2)}</span>
+                  <span>-{formatCurrency(lastSale.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-lg">
                 <span>Total:</span>
-                <span>${parseFloat(lastSale.total_amount).toFixed(2)}</span>
+                <span>{formatCurrency(lastSale.total_amount)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Payment:</span>
@@ -731,7 +899,7 @@ export default function Checkout() {
               {lastSale.change_returned > 0 && (
                 <div className="flex justify-between">
                   <span>Change:</span>
-                  <span>${parseFloat(lastSale.change_returned).toFixed(2)}</span>
+                  <span>{formatCurrency(lastSale.change_returned)}</span>
                 </div>
               )}
             </div>
@@ -783,7 +951,7 @@ export default function Checkout() {
                             {format(new Date(held.created_at), 'MMM dd, yyyy HH:mm')}
                           </p>
                         </div>
-                        <p className="font-bold text-lg">${parseFloat(held.total_amount).toFixed(2)}</p>
+                        <p className="font-bold text-lg">{formatCurrency(held.total_amount)}</p>
                       </div>
                       <div className="text-sm text-gray-600 mb-3">
                         {items.length} items
@@ -810,6 +978,55 @@ export default function Checkout() {
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credit Sale Customer Modal */}
+      {showCreditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h2 className="text-2xl font-bold mb-4">Select Customer for Credit Sale</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Customer *</label>
+                <select
+                  value={selectedCustomer?.id || ''}
+                  onChange={(e) => {
+                    const customer = customers.find(c => c.id === parseInt(e.target.value));
+                    setSelectedCustomer(customer || null);
+                    if (customer) {
+                      setShowCreditModal(false);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded"
+                >
+                  <option value="">Select customer...</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} {customer.phone ? `(${customer.phone})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setIsCreditSale(false);
+                    setShowCreditModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancel Credit Sale
+                </button>
+                <button
+                  onClick={() => setShowCreditModal(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         </div>

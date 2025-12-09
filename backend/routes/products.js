@@ -82,29 +82,46 @@ router.post('/', authenticate, authorize('admin'), [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, category_id, buying_price, selling_price, stock_quantity, barcode, supplier_id, expiry_date } = req.body;
+    const { name, category_id, buying_price, selling_price, wholesale_price, stock_quantity, barcode, supplier_id, expiry_date, image_url, unit_type, base_unit, units_per_bulk, bulk_price, unit_price } = req.body;
 
-    // Generate barcode if not provided
-    let productBarcode = barcode;
-    if (!productBarcode) {
-      productBarcode = `PRD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    // Check if barcode already exists (only if provided)
+    if (barcode && barcode.trim()) {
+      const existingBarcode = await query('SELECT id FROM products WHERE barcode = $1', [barcode.trim()]);
+      if (existingBarcode.rows.length > 0) {
+        return res.status(400).json({ error: 'Barcode already exists' });
+      }
     }
 
     const result = await query(
-      `INSERT INTO products (name, category_id, buying_price, selling_price, stock_quantity, barcode, supplier_id, expiry_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO products (name, category_id, buying_price, selling_price, wholesale_price, stock_quantity, barcode, supplier_id, expiry_date, image_url, unit_type, base_unit, units_per_bulk, bulk_price, unit_price)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
-      [name, category_id || null, buying_price, selling_price, stock_quantity, productBarcode, supplier_id || null, expiry_date || null]
+      [
+        name, category_id || null, buying_price, selling_price, wholesale_price || null, stock_quantity, 
+        barcode && barcode.trim() ? barcode.trim() : null, supplier_id || null, expiry_date || null, image_url || null,
+        unit_type || 'piece', base_unit || null, units_per_bulk || null, bulk_price || null, unit_price || null
+      ]
     );
 
-    await auditLog(req.user.id, 'CREATE', 'products', result.rows[0].id, { name, barcode: productBarcode });
+    // Log audit (non-blocking)
+    auditLog(req.user.id, 'CREATE', 'products', result.rows[0].id, { name, barcode: barcode || null }).catch(err => {
+      console.error('Audit log failed:', err);
+    });
+    
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create product error:', error);
+    console.error('Error details:', error.message, error.stack);
     if (error.code === '23505') {
-      return res.status(400).json({ error: 'Barcode already exists' });
+      // Check which unique constraint was violated
+      if (error.constraint && error.constraint.includes('barcode')) {
+        return res.status(400).json({ error: 'Barcode already exists' });
+      } else if (error.constraint && error.constraint.includes('name')) {
+        return res.status(400).json({ error: 'Product name already exists' });
+      }
+      return res.status(400).json({ error: 'A product with this information already exists' });
     }
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: error.message || 'Server error' });
   }
 });
 
@@ -120,15 +137,30 @@ router.put('/:id', authenticate, authorize('admin'), [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, category_id, buying_price, selling_price, stock_quantity, barcode, supplier_id, expiry_date } = req.body;
+    const { name, category_id, buying_price, selling_price, wholesale_price, stock_quantity, barcode, supplier_id, expiry_date, image_url, unit_type, base_unit, units_per_bulk, bulk_price, unit_price } = req.body;
+
+    // Check if barcode already exists (only if provided and different from current)
+    if (barcode && barcode.trim()) {
+      const existingBarcode = await query('SELECT id FROM products WHERE barcode = $1 AND id != $2', [barcode.trim(), req.params.id]);
+      if (existingBarcode.rows.length > 0) {
+        return res.status(400).json({ error: 'Barcode already exists' });
+      }
+    }
 
     const result = await query(
       `UPDATE products
-       SET name = $1, category_id = $2, buying_price = $3, selling_price = $4,
-           stock_quantity = $5, barcode = $6, supplier_id = $7, expiry_date = $8, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9
+       SET name = $1, category_id = $2, buying_price = $3, selling_price = $4, wholesale_price = $5,
+           stock_quantity = $6, barcode = $7, supplier_id = $8, expiry_date = $9, image_url = $10,
+           unit_type = $11, base_unit = $12, units_per_bulk = $13, bulk_price = $14, unit_price = $15,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $16
        RETURNING *`,
-      [name, category_id || null, buying_price, selling_price, stock_quantity, barcode, supplier_id || null, expiry_date || null, req.params.id]
+      [
+        name, category_id || null, buying_price, selling_price, wholesale_price || null, stock_quantity, 
+        barcode && barcode.trim() ? barcode.trim() : null, supplier_id || null, expiry_date || null, image_url || null,
+        unit_type || 'piece', base_unit || null, units_per_bulk || null, bulk_price || null, unit_price || null,
+        req.params.id
+      ]
     );
 
     if (result.rows.length === 0) {

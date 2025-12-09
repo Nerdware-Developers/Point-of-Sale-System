@@ -99,9 +99,10 @@ router.post('/', authenticate, [
       const { customer_id, payment_methods, notes } = req.body;
       const paymentMethodsJson = payment_methods ? JSON.stringify(payment_methods) : JSON.stringify([{ method: payment_method, amount: total_amount }]);
       
+      const { sale_type = 'retail' } = req.body;
       const saleResult = await client.query(
-        `INSERT INTO sales (sale_id, cashier_id, customer_id, items, subtotal, tax, discount, total_amount, payment_method, payment_methods, cash_given, change_returned, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `INSERT INTO sales (sale_id, cashier_id, customer_id, items, subtotal, tax, discount, total_amount, payment_method, payment_methods, cash_given, change_returned, notes, sale_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [
           saleId,
@@ -117,6 +118,7 @@ router.post('/', authenticate, [
           cash_given || null,
           change_returned || null,
           notes || null,
+          sale_type,
         ]
       );
 

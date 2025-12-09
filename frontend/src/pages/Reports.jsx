@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Download, Calendar } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -276,17 +277,17 @@ export default function Reports() {
                   <div>
                     <p className="text-gray-600">Total Revenue</p>
                     <p className="text-2xl font-bold text-green-600">
-                      ${parseFloat(dailyReport.summary?.total_revenue || 0).toFixed(2)}
+                      {formatCurrency(dailyReport.summary?.total_revenue || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Total Tax</p>
-                    <p className="text-2xl font-bold">${parseFloat(dailyReport.summary?.total_tax || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold">{formatCurrency(dailyReport.summary?.total_tax || 0)}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Total Discount</p>
                     <p className="text-2xl font-bold text-red-600">
-                      ${parseFloat(dailyReport.summary?.total_discount || 0).toFixed(2)}
+                      {formatCurrency(dailyReport.summary?.total_discount || 0)}
                     </p>
                   </div>
                 </div>
@@ -300,7 +301,7 @@ export default function Reports() {
                       <div key={index} className="flex justify-between p-3 bg-gray-50 rounded">
                         <span className="font-semibold">{product.name}</span>
                         <span className="text-green-600 font-bold">
-                          Qty: {product.quantity} | ${product.revenue.toFixed(2)}
+                          Qty: {product.quantity} | {formatCurrency(product.revenue)}
                         </span>
                       </div>
                     ))}
@@ -324,17 +325,17 @@ export default function Reports() {
                   <div>
                     <p className="text-gray-600">Total Revenue</p>
                     <p className="text-2xl font-bold text-green-600">
-                      ${parseFloat(monthlyReport.summary?.total_revenue || 0).toFixed(2)}
+                      {formatCurrency(monthlyReport.summary?.total_revenue || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600">Total Tax</p>
-                    <p className="text-2xl font-bold">${parseFloat(monthlyReport.summary?.total_tax || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold">{formatCurrency(monthlyReport.summary?.total_tax || 0)}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Total Discount</p>
                     <p className="text-2xl font-bold text-red-600">
-                      ${parseFloat(monthlyReport.summary?.total_discount || 0).toFixed(2)}
+                      {formatCurrency(monthlyReport.summary?.total_discount || 0)}
                     </p>
                   </div>
                 </div>
@@ -369,7 +370,7 @@ export default function Reports() {
                         <p className="text-sm text-gray-600">Quantity Sold: {product.quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-green-600">${product.revenue.toFixed(2)}</p>
+                        <p className="font-bold text-green-600">{formatCurrency(product.revenue)}</p>
                       </div>
                     </div>
                   ))}
@@ -386,15 +387,15 @@ export default function Reports() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-green-600">${profit.total_revenue.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(profit.total_revenue)}</p>
                 </div>
                 <div>
                   <p className="text-gray-600">Total Cost</p>
-                  <p className="text-2xl font-bold text-red-600">${profit.total_cost.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-red-600">{formatCurrency(profit.total_cost)}</p>
                 </div>
                 <div>
                   <p className="text-gray-600">Total Profit</p>
-                  <p className="text-2xl font-bold text-blue-600">${profit.total_profit.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(profit.total_profit)}</p>
                 </div>
                 <div>
                   <p className="text-gray-600">Profit Margin</p>
@@ -416,8 +417,8 @@ export default function Reports() {
                         <p className="text-sm text-gray-600">Total Sales: {cashier.total_sales || 0}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-green-600">${parseFloat(cashier.total_revenue || 0).toFixed(2)}</p>
-                        <p className="text-sm text-gray-600">Avg: ${parseFloat(cashier.avg_sale_amount || 0).toFixed(2)}</p>
+                        <p className="font-bold text-green-600">{formatCurrency(cashier.total_revenue || 0)}</p>
+                        <p className="text-sm text-gray-600">Avg: {formatCurrency(cashier.avg_sale_amount || 0)}</p>
                       </div>
                     </div>
                   ))}
@@ -435,19 +436,19 @@ export default function Reports() {
                 <div>
                   <p className="text-gray-600">Total Cost Value</p>
                   <p className="text-2xl font-bold text-red-600">
-                    ${parseFloat(stockValuation.summary?.total_cost_value || 0).toFixed(2)}
+                    {formatCurrency(stockValuation.summary?.total_cost_value || 0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Total Selling Value</p>
                   <p className="text-2xl font-bold text-green-600">
-                    ${parseFloat(stockValuation.summary?.total_selling_value || 0).toFixed(2)}
+                    {formatCurrency(stockValuation.summary?.total_selling_value || 0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-600">Profit Potential</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    ${parseFloat(stockValuation.summary?.total_profit_potential || 0).toFixed(2)}
+                    {formatCurrency(stockValuation.summary?.total_profit_potential || 0)}
                   </p>
                 </div>
                 <div>
@@ -468,10 +469,10 @@ export default function Reports() {
                         <span className="font-semibold">{cat.category_name || 'Uncategorized'}</span>
                         <div className="text-right">
                           <p className="text-green-600 font-bold">
-                            ${parseFloat(cat.category_selling_value || 0).toFixed(2)}
+                            {formatCurrency(cat.category_selling_value || 0)}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Cost: ${parseFloat(cat.category_cost_value || 0).toFixed(2)}
+                            Cost: {formatCurrency(cat.category_cost_value || 0)}
                           </p>
                         </div>
                       </div>

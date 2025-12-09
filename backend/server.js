@@ -20,6 +20,8 @@ import barcodeRoutes from './routes/barcode.js';
 import uploadRoutes from './routes/upload.js';
 import importExportRoutes from './routes/import-export.js';
 import notificationRoutes from './routes/notifications.js';
+import creditSalesRoutes from './routes/credit-sales.js';
+import dailyClosingsRoutes from './routes/daily-closings.js';
 
 dotenv.config();
 
@@ -86,6 +88,8 @@ app.use('/api/barcode', barcodeRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/import-export', importExportRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/credit-sales', creditSalesRoutes);
+app.use('/api/daily-closings', dailyClosingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

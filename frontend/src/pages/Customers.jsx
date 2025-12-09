@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Plus, Edit, Trash2, Search, User, ShoppingBag } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 
 export default function Customers() {
@@ -155,7 +156,7 @@ export default function Customers() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap font-semibold">
-                  ${parseFloat(customer.total_purchases || 0).toFixed(2)}
+                  {formatCurrency(customer.total_purchases || 0)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex gap-2">

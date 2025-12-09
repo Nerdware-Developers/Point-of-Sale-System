@@ -164,7 +164,7 @@ export default function Promotions() {
                   <span className="font-bold text-green-600">
                     {promotion.discount_type === 'percentage'
                       ? `${promotion.discount_value}%`
-                      : `$${promotion.discount_value}`}
+                      : `Ksh ${promotion.discount_value}`}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">{format(new Date(promotion.start_date), 'MMM dd, yyyy')}</td>
@@ -239,7 +239,7 @@ export default function Promotions() {
                     required
                   >
                     <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount ($)</option>
+                    <option value="fixed">Fixed Amount (Ksh)</option>
                   </select>
                 </div>
                 <div>

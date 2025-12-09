@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Plus, Edit, Package, CheckCircle, XCircle } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -123,7 +124,7 @@ export default function PurchaseOrders() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {order.expected_date ? format(new Date(order.expected_date), 'MMM dd, yyyy') : 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-bold">${parseFloat(order.total_amount).toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-bold">{formatCurrency(order.total_amount)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 py-1 rounded text-sm font-semibold ${
@@ -248,7 +249,7 @@ export default function PurchaseOrders() {
                         className="w-24 px-3 py-2 border border-gray-300 rounded"
                         min="1"
                       />
-                      <span className="w-24">${item.price?.toFixed(2) || '0.00'}</span>
+                      <span className="w-24">{formatCurrency(item.price || 0)}</span>
                       <button
                         type="button"
                         onClick={() => {

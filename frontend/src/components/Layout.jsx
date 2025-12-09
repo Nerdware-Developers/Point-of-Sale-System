@@ -9,11 +9,14 @@ import {
   Truck,
   DollarSign,
   Users,
-  UserCircle,
+  Store,
   RotateCcw,
   ShoppingBag,
   TrendingUp,
   Tag,
+  CreditCard,
+  Calendar,
+  ScanBarcode,
 } from 'lucide-react';
 
 export default function Layout() {
@@ -22,6 +25,7 @@ export default function Layout() {
   // All menu items available - no authentication required
   const menuItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/shop', icon: Store, label: 'Shop' },
     { path: '/checkout', icon: ShoppingCart, label: 'Checkout' },
     { path: '/products', icon: Package, label: 'Products' },
     { path: '/sales', icon: Receipt, label: 'Sales' },
@@ -29,11 +33,13 @@ export default function Layout() {
     { path: '/categories', icon: FolderTree, label: 'Categories' },
     { path: '/suppliers', icon: Truck, label: 'Suppliers' },
     { path: '/expenses', icon: DollarSign, label: 'Expenses' },
-    { path: '/customers', icon: UserCircle, label: 'Customers' },
     { path: '/returns', icon: RotateCcw, label: 'Returns' },
     { path: '/promotions', icon: Tag, label: 'Promotions' },
     { path: '/purchase-orders', icon: ShoppingBag, label: 'Purchase Orders' },
     { path: '/stock-adjustments', icon: TrendingUp, label: 'Stock Adjustments' },
+    { path: '/credit-sales', icon: CreditCard, label: 'Credit Sales' },
+    { path: '/daily-closings', icon: Calendar, label: 'Daily Closings' },
+    { path: '/barcode-generator', icon: ScanBarcode, label: 'Barcode Generator' },
     { path: '/users', icon: Users, label: 'Users' },
   ];
 

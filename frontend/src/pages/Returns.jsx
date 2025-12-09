@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Plus, Search, Receipt, X } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -104,7 +105,7 @@ export default function Returns() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">{returnItem.sale_id || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap font-bold text-red-600">
-                    ${parseFloat(returnItem.total_amount).toFixed(2)}
+                    {formatCurrency(returnItem.total_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap capitalize">{returnItem.refund_method}</td>
                   <td className="px-6 py-4">{returnItem.reason || 'N/A'}</td>
@@ -186,7 +187,7 @@ export default function Returns() {
 
             <div className="mb-4 p-3 bg-red-50 rounded">
               <p className="font-bold text-red-600">
-                Total Refund: ${returnItems.reduce((sum, item) => sum + (item.price * item.return_quantity), 0).toFixed(2)}
+                Total Refund: {formatCurrency(returnItems.reduce((sum, item) => sum + (item.price * item.return_quantity), 0))}
               </p>
             </div>
 
