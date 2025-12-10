@@ -314,9 +314,9 @@ export default function Products() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Products</h1>
+    <div className="p-2 sm:p-4 lg:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Products</h1>
         <button
           onClick={() => {
             setEditingProduct(null);
@@ -342,93 +342,164 @@ export default function Products() {
               barcodeInputRef.current?.focus();
             }, 100);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto justify-center"
         >
-          <Plus className="w-5 h-5" />
-          Add Product
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="hidden sm:inline">Add Product</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products by name or barcode..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search products..."
+            className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      {/* Products Table */}
+      {/* Products - Desktop Table / Mobile Cards */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buying Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retail Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Wholesale Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredProducts.map((product) => (
-              <tr key={product.id} className={product.stock_quantity < 10 ? 'bg-red-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${product.image_url}`}
-                        alt={product.name}
-                        className="w-10 h-10 object-cover rounded mr-2"
-                      />
-                    ) : (
-                      <Package className="w-5 h-5 text-gray-400 mr-2" />
+        {/* Desktop Table */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buying Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retail Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Wholesale Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className={product.stock_quantity < 10 ? 'bg-red-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${product.image_url}`}
+                          alt={product.name}
+                          className="w-10 h-10 object-cover rounded mr-2"
+                        />
+                      ) : (
+                        <Package className="w-5 h-5 text-gray-400 mr-2" />
+                      )}
+                      <span className="font-medium">{product.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{product.category_name || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-mono text-sm">{product.barcode}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(product.buying_price)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-semibold">{formatCurrency(product.selling_price)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                    {product.wholesale_price ? formatCurrency(product.wholesale_price) : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded text-sm font-semibold ${
+                      product.stock_quantity < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {product.stock_quantity}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="lg:hidden divide-y divide-gray-200">
+          {filteredProducts.map((product) => (
+            <div key={product.id} className={`p-4 ${product.stock_quantity < 10 ? 'bg-red-50' : ''}`}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center flex-1 min-w-0">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${product.image_url}`}
+                      alt={product.name}
+                      className="w-12 h-12 object-cover rounded mr-3 flex-shrink-0"
+                    />
+                  ) : (
+                    <Package className="w-8 h-8 text-gray-400 mr-3 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
+                    <p className="text-sm text-gray-500">{product.category_name || 'N/A'}</p>
+                    {product.barcode && (
+                      <p className="text-xs text-gray-400 font-mono mt-1">Barcode: {product.barcode}</p>
                     )}
-                    <span className="font-medium">{product.name}</span>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600">{product.category_name || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-mono text-sm">{product.barcode}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(product.buying_price)}</td>
-                <td className="px-6 py-4 whitespace-nowrap font-semibold">{formatCurrency(product.selling_price)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                  {product.wholesale_price ? formatCurrency(product.wholesale_price) : 'N/A'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded text-sm font-semibold ${
+                </div>
+                <div className="flex gap-2 ml-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleEdit(product)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(product.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Buying:</span>
+                  <span className="ml-2 font-medium">{formatCurrency(product.buying_price)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Retail:</span>
+                  <span className="ml-2 font-semibold text-blue-600">{formatCurrency(product.selling_price)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Wholesale:</span>
+                  <span className="ml-2 font-medium">
+                    {product.wholesale_price ? formatCurrency(product.wholesale_price) : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Stock:</span>
+                  <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
                     product.stock_quantity < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                   }`}>
                     {product.stock_quantity}
                   </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {filteredProducts.length === 0 && (
           <div className="text-center py-8 text-gray-500">No products found</div>
         )}
@@ -436,9 +507,9 @@ export default function Products() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-6">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Barcode Scanner Section */}
               <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
@@ -474,7 +545,7 @@ export default function Products() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Product Name *</label>
                   <input
@@ -497,7 +568,7 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Category</label>
                   <select
@@ -530,7 +601,7 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Buying Price *</label>
                   <input
@@ -559,7 +630,7 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Wholesale Selling Price *</label>
                   <input
@@ -589,12 +660,12 @@ export default function Products() {
 
               {/* Bulk/Unit Configuration */}
               <div className="border-t pt-4 mt-4">
-                <h3 className="text-lg font-semibold mb-3">Bulk/Unit Sales Configuration (Optional)</h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <h3 className="text-base sm:text-lg font-semibold mb-3">Bulk/Unit Sales Configuration (Optional)</h3>
+                <p className="text-xs sm:text-sm text-gray-600 mb-4">
                   Configure if this product can be sold in bulk (e.g., 20L container) or per unit (e.g., per liter)
                 </p>
                 
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Base Unit (e.g., "liter", "packet", "kg")</label>
                     <input
@@ -619,7 +690,7 @@ export default function Products() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Bulk Price (Price for entire bulk)</label>
                     <input
