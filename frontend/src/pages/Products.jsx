@@ -108,10 +108,10 @@ export default function Products() {
       // Prepare data with proper types and handle empty strings
       const submitData = {
         name: formData.name.trim(),
-        buying_price: buyingPrice || 0,
-        selling_price: sellingPrice || 0,
-        wholesale_price: wholesalePrice || null,
-        stock_quantity: stockQuantity,
+        buying_price: buyingPrice !== null ? buyingPrice : 0,
+        selling_price: sellingPrice !== null ? sellingPrice : 0,
+        wholesale_price: wholesalePrice !== null ? wholesalePrice : null,
+        stock_quantity: stockQuantity || 0,
         category_id: formData.category_id || null,
         supplier_id: null, // Removed supplier
         barcode: null, // Removed barcode
