@@ -81,9 +81,6 @@ export default function Products() {
       const sellingPrice = parseFloat(formData.selling_price);
       const wholesalePrice = parseFloat(formData.wholesale_price);
       const stockQuantity = parseInt(formData.stock_quantity);
-      const unitsPerBulk = formData.units_per_bulk ? parseFloat(formData.units_per_bulk) : null;
-      const bulkPrice = formData.bulk_price ? parseFloat(formData.bulk_price) : null;
-      const unitPrice = formData.unit_price ? parseFloat(formData.unit_price) : null;
 
       if (isNaN(buyingPrice) || buyingPrice < 0) {
         toast.error('Valid buying price is required');
