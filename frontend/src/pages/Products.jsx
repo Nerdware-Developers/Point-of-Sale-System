@@ -121,7 +121,7 @@ export default function Products() {
       
       const buyingPrice = parseFloat(formData.buying_price);
       const sellingPrice = parseFloat(formData.selling_price);
-      const wholesalePrice = formData.wholesale_price ? parseFloat(formData.wholesale_price) : null;
+      const wholesalePrice = parseFloat(formData.wholesale_price);
       const stockQuantity = parseInt(formData.stock_quantity);
       const unitsPerBulk = formData.units_per_bulk ? parseFloat(formData.units_per_bulk) : null;
       const bulkPrice = formData.bulk_price ? parseFloat(formData.bulk_price) : null;
@@ -133,12 +133,13 @@ export default function Products() {
       }
 
       if (isNaN(sellingPrice) || sellingPrice < 0) {
-        toast.error('Valid selling price is required');
+        toast.error('Valid retail selling price is required');
         return;
       }
 
-      if (wholesalePrice !== null && (isNaN(wholesalePrice) || wholesalePrice < 0)) {
-        toast.error('Valid wholesale price is required (or leave empty)');
+      // Validate wholesale price is required
+      if (!formData.wholesale_price || isNaN(wholesalePrice) || wholesalePrice < 0) {
+        toast.error('Valid wholesale selling price is required');
         return;
       }
 
@@ -169,7 +170,7 @@ export default function Products() {
         category_id: formData.category_id || null,
         supplier_id: formData.supplier_id || null,
         barcode: formData.barcode && formData.barcode.trim() ? formData.barcode.trim() : null,
-        expiry_date: formData.expiry_date || null,
+        expiry_date: null, // Removed expiry date
         image_url: formData.image_url || null,
         unit_type: formData.unit_type || 'piece',
         base_unit: formData.base_unit && formData.base_unit.trim() ? formData.base_unit.trim() : null,
@@ -192,11 +193,16 @@ export default function Products() {
         category_id: '',
         buying_price: '',
         selling_price: '',
+        wholesale_price: '',
         stock_quantity: '',
         barcode: '',
         supplier_id: '',
-        expiry_date: '',
         image_url: '',
+        unit_type: 'piece',
+        base_unit: '',
+        units_per_bulk: '',
+        bulk_price: '',
+        unit_price: '',
       });
       fetchProducts();
     } catch (error) {
@@ -225,23 +231,22 @@ export default function Products() {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      category_id: product.category_id || '',
-      buying_price: product.buying_price,
-      selling_price: product.selling_price,
-      wholesale_price: product.wholesale_price || '',
-      stock_quantity: product.stock_quantity,
-      barcode: product.barcode || '',
-      supplier_id: product.supplier_id || '',
-      expiry_date: product.expiry_date || '',
-      image_url: product.image_url || '',
-      unit_type: product.unit_type || 'piece',
-      base_unit: product.base_unit || '',
-      units_per_bulk: product.units_per_bulk || '',
-      bulk_price: product.bulk_price || '',
-      unit_price: product.unit_price || '',
-    });
+      setFormData({
+        name: product.name,
+        category_id: product.category_id || '',
+        buying_price: product.buying_price,
+        selling_price: product.selling_price,
+        wholesale_price: product.wholesale_price || '',
+        stock_quantity: product.stock_quantity,
+        barcode: product.barcode || '',
+        supplier_id: product.supplier_id || '',
+        image_url: product.image_url || '',
+        unit_type: product.unit_type || 'piece',
+        base_unit: product.base_unit || '',
+        units_per_bulk: product.units_per_bulk || '',
+        bulk_price: product.bulk_price || '',
+        unit_price: product.unit_price || '',
+      });
     setShowModal(true);
     // Focus barcode input when editing
     setTimeout(() => {
@@ -324,7 +329,7 @@ export default function Products() {
               stock_quantity: '',
               barcode: '',
               supplier_id: '',
-              expiry_date: '',
+              image_url: '',
               unit_type: 'piece',
               base_unit: '',
               units_per_bulk: '',
@@ -380,7 +385,7 @@ export default function Products() {
                   <div className="flex items-center">
                     {product.image_url ? (
                       <img
-                        src={`http://localhost:5000${product.image_url}`}
+                        src={product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${product.image_url}`}
                         alt={product.name}
                         className="w-10 h-10 object-cover rounded mr-2"
                       />
@@ -526,40 +531,47 @@ export default function Products() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Buying Price *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.buying_price}
-                      onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Retail Price *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.selling_price}
-                      onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Wholesale Price</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.wholesale_price}
-                      onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      placeholder="Optional"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Buying Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.buying_price}
+                    onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    placeholder="0.00"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Cost price when purchasing from supplier</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Retail Selling Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.selling_price}
+                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    placeholder="0.00"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Price for retail customers</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Wholesale Selling Price *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.wholesale_price}
+                    onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    placeholder="0.00"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Price for wholesale/bulk customers</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
@@ -568,8 +580,10 @@ export default function Products() {
                     value={formData.stock_quantity}
                     onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded"
+                    placeholder="0"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Current stock available</p>
                 </div>
               </div>
 
@@ -635,34 +649,42 @@ export default function Products() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Expiry Date</label>
-                <input
-                  type="date"
-                  value={formData.expiry_date}
-                  onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium mb-1">Product Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full px-3 py-2 border border-gray-300 rounded"
-                  disabled={uploadingImage}
-                />
-                {uploadingImage && <p className="text-sm text-gray-500 mt-1">Uploading...</p>}
-                {formData.image_url && (
-                  <div className="mt-2">
-                    <img
-                      src={`http://localhost:5000${formData.image_url}`}
-                      alt="Product"
-                      className="w-32 h-32 object-cover rounded border"
-                    />
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="w-full px-3 py-2 border border-gray-300 rounded cursor-pointer"
+                        disabled={uploadingImage}
+                      />
+                      <span className="text-xs text-gray-500 block mt-1">Choose from gallery</span>
+                    </label>
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageUpload}
+                        className="w-full px-3 py-2 border border-gray-300 rounded cursor-pointer"
+                        disabled={uploadingImage}
+                      />
+                      <span className="text-xs text-gray-500 block mt-1">Take a photo</span>
+                    </label>
                   </div>
-                )}
+                  {uploadingImage && <p className="text-sm text-gray-500">Uploading...</p>}
+                  {formData.image_url && (
+                    <div className="mt-2">
+                      <img
+                        src={formData.image_url.startsWith('http') ? formData.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${formData.image_url}`}
+                        alt="Product"
+                        className="w-32 h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -682,10 +704,16 @@ export default function Products() {
                       category_id: '',
                       buying_price: '',
                       selling_price: '',
+                      wholesale_price: '',
                       stock_quantity: '',
                       barcode: '',
                       supplier_id: '',
-                      expiry_date: '',
+                      image_url: '',
+                      unit_type: 'piece',
+                      base_unit: '',
+                      units_per_bulk: '',
+                      bulk_price: '',
+                      unit_price: '',
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
