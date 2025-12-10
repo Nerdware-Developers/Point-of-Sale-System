@@ -77,17 +77,43 @@ export default function ReceiptScanner() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // 60 second timeout for OCR processing
       });
 
-      if (response.data.items && response.data.items.length > 0) {
-        setExtractedItems(response.data.items);
-        toast.success(`Found ${response.data.items.length} items on receipt`);
+      if (response.data && response.data.success) {
+        if (response.data.items && response.data.items.length > 0) {
+          setExtractedItems(response.data.items);
+          toast.success(`Found ${response.data.items.length} items on receipt`);
+        } else {
+          const message = response.data.message || 'No items found on receipt. Please try a clearer image.';
+          toast.error(message);
+          if (response.data.rawText) {
+            console.log('Extracted text:', response.data.rawText);
+          }
+        }
       } else {
-        toast.error('No items found on receipt. Please try a clearer image.');
+        toast.error('Unexpected response from server');
       }
     } catch (error) {
       console.error('Receipt processing error:', error);
-      toast.error(error.response?.data?.error || 'Failed to process receipt. Please try again.');
+      console.error('Error response:', error.response?.data);
+      
+      // Provide detailed error message
+      let errorMessage = 'Failed to process receipt. Please try again.';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+        if (error.response.data.details) {
+          errorMessage += `: ${error.response.data.details}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Processing timeout. The receipt may be too complex. Please try a simpler image.';
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
     }

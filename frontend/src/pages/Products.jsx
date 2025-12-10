@@ -209,17 +209,37 @@ export default function Products() {
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+    if (!file) {
+      // Reset file input
+      e.target.value = '';
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+    // Validate file type - accept all image formats
+    const validImageTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/bmp',
+      'image/svg+xml',
+      'image/tiff',
+      'image/x-icon',
+    ];
+    
+    const isValidType = file.type.startsWith('image/') || validImageTypes.includes(file.type.toLowerCase());
+    
+    if (!isValidType) {
+      toast.error(`Invalid file type. Please select an image file (JPG, PNG, GIF, WebP, etc.)`);
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be less than 10MB');
+      e.target.value = '';
       return;
     }
 
@@ -232,14 +252,38 @@ export default function Products() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000, // 30 second timeout for large files
       });
 
-      // Update form data with image URL while preserving all other fields
-      setFormData(prevFormData => ({ ...prevFormData, image_url: response.data.imageUrl }));
-      toast.success('Image uploaded successfully');
+      if (response.data && response.data.imageUrl) {
+        // Update form data with image URL while preserving all other fields
+        setFormData(prevFormData => ({ ...prevFormData, image_url: response.data.imageUrl }));
+        toast.success('Image uploaded successfully');
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
-      toast.error('Failed to upload image');
       console.error('Upload error:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // Provide detailed error message
+      let errorMessage = 'Failed to upload image';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+        if (error.response.data.details) {
+          errorMessage += `: ${error.response.data.details}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timeout. Please try a smaller image or check your connection.';
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      toast.error(errorMessage);
+      // Reset file input on error
+      e.target.value = '';
     } finally {
       setUploadingImage(false);
     }
