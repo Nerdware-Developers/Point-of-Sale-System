@@ -22,6 +22,7 @@ import importExportRoutes from './routes/import-export.js';
 import notificationRoutes from './routes/notifications.js';
 import creditSalesRoutes from './routes/credit-sales.js';
 import dailyClosingsRoutes from './routes/daily-closings.js';
+import receiptRoutes from './routes/receipt.js';
 
 dotenv.config();
 
@@ -122,6 +123,7 @@ app.use('/api/import-export', importExportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/credit-sales', creditSalesRoutes);
 app.use('/api/daily-closings', dailyClosingsRoutes);
+app.use('/api/receipt', receiptRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

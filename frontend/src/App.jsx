@@ -18,6 +18,7 @@ import Promotions from './pages/Promotions';
 import CreditSales from './pages/CreditSales';
 import DailyClosings from './pages/DailyClosings';
 import BarcodeGenerator from './pages/BarcodeGenerator';
+import ReceiptScanner from './pages/ReceiptScanner';
 import Layout from './components/Layout';
 import OfflineIndicator from './components/OfflineIndicator';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="credit-sales" element={<CreditSales />} />
         <Route path="daily-closings" element={<DailyClosings />} />
         <Route path="barcode-generator" element={<BarcodeGenerator />} />
+        <Route path="receipt-scanner" element={<ReceiptScanner />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

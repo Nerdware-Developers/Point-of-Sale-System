@@ -20,6 +20,7 @@ import {
   ScanBarcode,
   Menu,
   X,
+  FileText,
 } from 'lucide-react';
 
 export default function Layout() {
@@ -62,6 +63,7 @@ export default function Layout() {
     { path: '/credit-sales', icon: CreditCard, label: 'Credit Sales' },
     { path: '/daily-closings', icon: Calendar, label: 'Daily Closings' },
     { path: '/barcode-generator', icon: ScanBarcode, label: 'Barcode Generator' },
+    { path: '/receipt-scanner', icon: FileText, label: 'Receipt Scanner' },
     { path: '/users', icon: Users, label: 'Users' },
   ];
 
