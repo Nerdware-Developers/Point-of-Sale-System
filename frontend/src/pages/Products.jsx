@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { Plus, Edit, Trash2, Search, Package, ScanLine, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, Camera, Upload, X } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import toast from 'react-hot-toast';
 
@@ -30,8 +30,6 @@ export default function Products() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isScanning, setIsScanning] = useState(false);
-  const barcodeInputRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
@@ -68,49 +66,9 @@ export default function Products() {
     }
   };
 
-  // Check if barcode already exists
-  const checkBarcodeExists = (barcode) => {
-    if (!barcode || !barcode.trim()) return false;
-    return products.some(p => p.barcode && p.barcode === barcode.trim() && p.id !== editingProduct?.id);
-  };
-
-  // Handle barcode scan
-  const handleBarcodeScan = (barcode) => {
-    if (!barcode || !barcode.trim()) return;
-
-    // Check if product with this barcode already exists
-    const existingProduct = products.find(p => p.barcode && p.barcode === barcode.trim());
-    
-    if (existingProduct && !editingProduct) {
-      toast.error(`Product with barcode ${barcode} already exists: ${existingProduct.name}`);
-      setFormData({ ...formData, barcode: '' });
-      return;
-    }
-
-    // Visual feedback
-    setIsScanning(true);
-    setTimeout(() => setIsScanning(false), 300);
-    
-    setFormData({ ...formData, barcode: barcode.trim() });
-    toast.success('Barcode scanned successfully', { duration: 1000 });
-    
-    // Auto-focus next field (product name) if empty
-    setTimeout(() => {
-      const nameInput = document.querySelector('input[type="text"][value=""]');
-      if (nameInput && !formData.name) {
-        nameInput.focus();
-      }
-    }, 100);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Check for duplicate barcode (only if barcode is provided)
-    if (formData.barcode && formData.barcode.trim() && checkBarcodeExists(formData.barcode.trim())) {
-      toast.error('A product with this barcode already exists');
-      return;
-    }
 
     try {
       // Validate required fields
@@ -148,16 +106,10 @@ export default function Products() {
         return;
       }
 
-      // Validate bulk/unit pricing if base unit is provided
-      if (formData.base_unit && formData.base_unit.trim()) {
-        if (!unitsPerBulk || unitsPerBulk <= 0) {
-          toast.error('Units per bulk is required when base unit is specified');
-          return;
-        }
-        if ((!bulkPrice || bulkPrice < 0) && (!unitPrice || unitPrice < 0)) {
-          toast.error('Either bulk price or unit price (or both) must be provided when base unit is specified');
-          return;
-        }
+      // Validate image is required
+      if (!formData.image_url) {
+        toast.error('Please take or upload a product photo');
+        return;
       }
 
       // Prepare data with proper types and handle empty strings
@@ -168,15 +120,15 @@ export default function Products() {
         wholesale_price: wholesalePrice,
         stock_quantity: stockQuantity,
         category_id: formData.category_id || null,
-        supplier_id: formData.supplier_id || null,
-        barcode: formData.barcode && formData.barcode.trim() ? formData.barcode.trim() : null,
-        expiry_date: null, // Removed expiry date
+        supplier_id: null, // Removed supplier
+        barcode: null, // Removed barcode
+        expiry_date: null,
         image_url: formData.image_url || null,
-        unit_type: formData.unit_type || 'piece',
-        base_unit: formData.base_unit && formData.base_unit.trim() ? formData.base_unit.trim() : null,
-        units_per_bulk: unitsPerBulk,
-        bulk_price: bulkPrice,
-        unit_price: unitPrice,
+        unit_type: 'piece',
+        base_unit: null,
+        units_per_bulk: null,
+        bulk_price: null,
+        unit_price: null,
       };
 
       if (editingProduct) {
@@ -195,8 +147,6 @@ export default function Products() {
         selling_price: '',
         wholesale_price: '',
         stock_quantity: '',
-        barcode: '',
-        supplier_id: '',
         image_url: '',
         unit_type: 'piece',
         base_unit: '',
@@ -238,8 +188,6 @@ export default function Products() {
         selling_price: product.selling_price,
         wholesale_price: product.wholesale_price || '',
         stock_quantity: product.stock_quantity,
-        barcode: product.barcode || '',
-        supplier_id: product.supplier_id || '',
         image_url: product.image_url || '',
         unit_type: product.unit_type || 'piece',
         base_unit: product.base_unit || '',
@@ -248,10 +196,6 @@ export default function Products() {
         unit_price: product.unit_price || '',
       });
     setShowModal(true);
-    // Focus barcode input when editing
-    setTimeout(() => {
-      barcodeInputRef.current?.focus();
-    }, 100);
   };
 
   const handleDelete = async (id) => {
@@ -327,8 +271,6 @@ export default function Products() {
               selling_price: '',
               wholesale_price: '',
               stock_quantity: '',
-              barcode: '',
-              supplier_id: '',
               image_url: '',
               unit_type: 'piece',
               base_unit: '',
@@ -337,10 +279,6 @@ export default function Products() {
               unit_price: '',
             });
             setShowModal(true);
-            // Auto-focus barcode input when modal opens
-            setTimeout(() => {
-              barcodeInputRef.current?.focus();
-            }, 100);
           }}
           className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto justify-center"
         >
@@ -510,98 +448,112 @@ export default function Products() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Barcode Scanner Section */}
-              <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <ScanLine className="w-5 h-5 text-blue-600" />
-                  <label className="block text-sm font-semibold text-blue-600">Scan Barcode (Optional)</label>
-                </div>
-                <input
-                  ref={barcodeInputRef}
-                  type="text"
-                  value={formData.barcode}
-                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                  onKeyDown={(e) => {
-                    // Handle barcode scanner (sends Enter after barcode)
-                    if (e.key === 'Enter' && formData.barcode.trim()) {
-                      e.preventDefault();
-                      handleBarcodeScan(formData.barcode);
-                    }
-                  }}
-                  placeholder="Scan barcode with scanner or type manually (optional)..."
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-mono ${
-                    isScanning ? 'border-green-500 bg-green-50' : 'border-blue-300'
-                  }`}
-                  style={{ fontSize: '16px' }}
-                />
-                <p className="text-xs text-gray-600 mt-2">
-                  💡 Point your barcode scanner here and scan. The barcode will be automatically captured.
-                </p>
-                {formData.barcode && checkBarcodeExists(formData.barcode) && (
-                  <p className="text-xs text-red-600 mt-1">
-                    ⚠️ A product with this barcode already exists!
-                  </p>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Product Image - Prominent */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Product Photo *</label>
+                {formData.image_url ? (
+                  <div className="space-y-3">
+                    <div className="relative inline-block">
+                      <img
+                        src={formData.image_url.startsWith('http') ? formData.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${formData.image_url}`}
+                        alt="Product"
+                        className="w-48 h-48 object-cover rounded-lg border-2 border-gray-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, image_url: '' })}
+                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={uploadingImage}
+                        />
+                        <span className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                          <Upload className="w-4 h-4" />
+                          Change Photo
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
+                    <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 mb-4">Take a photo of the product</p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={uploadingImage}
+                        />
+                        <span className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                          <Camera className="w-5 h-5" />
+                          Take Photo
+                        </span>
+                      </label>
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={uploadingImage}
+                        />
+                        <span className="inline-flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium">
+                          <Upload className="w-5 h-5" />
+                          Choose File
+                        </span>
+                      </label>
+                    </div>
+                    {uploadingImage && <p className="text-sm text-gray-500 mt-3">Uploading...</p>}
+                  </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Product Name *</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Barcode (Optional)</label>
-                  <input
-                    type="text"
-                    value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded font-mono"
-                    placeholder="Type barcode here (optional)"
-                  />
-                </div>
+              {/* Product Name */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Product Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  placeholder="e.g., Njamba's Fortified Home Baking Flour"
+                  required
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
-                  <select
-                    value={formData.category_id}
-                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Supplier</label>
-                  <select
-                    value={formData.supplier_id}
-                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                  >
-                    <option value="">Select supplier</option>
-                    {suppliers.map((sup) => (
-                      <option key={sup.id} value={sup.id}>
-                        {sup.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Category</label>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                >
+                  <option value="">Select category (optional)</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Prices */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Buying Price *</label>
                   <input
@@ -609,153 +561,48 @@ export default function Products() {
                     step="0.01"
                     value={formData.buying_price}
                     onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     placeholder="0.00"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Cost price when purchasing from supplier</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Retail Selling Price *</label>
+                  <label className="block text-sm font-medium mb-1">Retail Price *</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     placeholder="0.00"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Price for retail customers</p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Wholesale Selling Price *</label>
+                  <label className="block text-sm font-medium mb-1">Wholesale Price *</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.wholesale_price}
                     onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     placeholder="0.00"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Price for wholesale/bulk customers</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
-                  <input
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                    placeholder="0"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Current stock available</p>
                 </div>
               </div>
 
-              {/* Bulk/Unit Configuration */}
-              <div className="border-t pt-4 mt-4">
-                <h3 className="text-base sm:text-lg font-semibold mb-3">Bulk/Unit Sales Configuration (Optional)</h3>
-                <p className="text-xs sm:text-sm text-gray-600 mb-4">
-                  Configure if this product can be sold in bulk (e.g., 20L container) or per unit (e.g., per liter)
-                </p>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Base Unit (e.g., "liter", "packet", "kg")</label>
-                    <input
-                      type="text"
-                      value={formData.base_unit}
-                      onChange={(e) => setFormData({ ...formData, base_unit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      placeholder="e.g., liter, packet, kg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Units Per Bulk</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.units_per_bulk}
-                      onChange={(e) => setFormData({ ...formData, units_per_bulk: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      placeholder="e.g., 20 (for 20L container)"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">How many units in one bulk item</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Bulk Price (Price for entire bulk)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.bulk_price}
-                      onChange={(e) => setFormData({ ...formData, bulk_price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      placeholder="e.g., 5000 (for 20L container)"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Unit Price (Price per unit)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                      placeholder="e.g., 250 (per liter)"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Example: Cooking oil - Base unit: "liter", Units per bulk: 20, Bulk price: 5000, Unit price: 250
-                </p>
-              </div>
-
+              {/* Stock Quantity */}
               <div>
-                <label className="block text-sm font-medium mb-1">Product Image</label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="w-full px-3 py-2 border border-gray-300 rounded cursor-pointer"
-                        disabled={uploadingImage}
-                      />
-                      <span className="text-xs text-gray-500 block mt-1">Choose from gallery</span>
-                    </label>
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleImageUpload}
-                        className="w-full px-3 py-2 border border-gray-300 rounded cursor-pointer"
-                        disabled={uploadingImage}
-                      />
-                      <span className="text-xs text-gray-500 block mt-1">Take a photo</span>
-                    </label>
-                  </div>
-                  {uploadingImage && <p className="text-sm text-gray-500">Uploading...</p>}
-                  {formData.image_url && (
-                    <div className="mt-2">
-                      <img
-                        src={formData.image_url.startsWith('http') ? formData.image_url : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${formData.image_url}`}
-                        alt="Product"
-                        className="w-32 h-32 object-cover rounded border"
-                      />
-                    </div>
-                  )}
-                </div>
+                <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
+                <input
+                  type="number"
+                  value={formData.stock_quantity}
+                  onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  placeholder="0"
+                  required
+                />
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -777,8 +624,6 @@ export default function Products() {
                       selling_price: '',
                       wholesale_price: '',
                       stock_quantity: '',
-                      barcode: '',
-                      supplier_id: '',
                       image_url: '',
                       unit_type: 'piece',
                       base_unit: '',
