@@ -1,133 +1,54 @@
 import pkg from 'pg';
 import dotenv from 'dotenv';
-import dns from 'dns';
-import { promisify } from 'util';
 
 dotenv.config();
 
-// Force IPv4 resolution globally for Supabase connections
-dns.setDefaultResultOrder('ipv4first');
-
 const { Pool } = pkg;
-const lookup = promisify(dns.lookup);
-const resolve4 = promisify(dns.resolve4);
 
-// For Supabase, use connection pooler (port 6543) which is more reliable
-const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
-const dbPort = parseInt(process.env.DB_PORT || (isSupabase ? '6543' : '5432'));
-
-// Get hostname - ensure it's correct (db. not aws-0-)
-let dbHost = process.env.DB_HOST || 'localhost';
-// Fix any aws-0- hostname issues
-if (dbHost.includes('aws-0-')) {
-  console.error('⚠️  FIXING: DB_HOST contains aws-0-, replacing with db. prefix');
-  dbHost = dbHost.replace('aws-0-', 'db.');
-}
-
-// Ensure hostname is correct format for Supabase
-if (isSupabase && !dbHost.startsWith('db.') && !dbHost.startsWith('aws-0-')) {
-  // If it's a Supabase host but missing prefix, add it
-  if (dbHost.includes('.supabase.co')) {
-    const projectRef = dbHost.match(/\.([^.]+)\.supabase\.co/)?.[1];
-    if (projectRef) {
-      dbHost = `db.${projectRef}.supabase.co`;
-      console.log(`✅ Fixed hostname to: ${dbHost}`);
-    }
+// Check if DATABASE_URL is provided (connection string format)
+// This is the most reliable method for Supabase
+const getDatabaseConfig = () => {
+  // If DATABASE_URL is set, use it directly (most reliable)
+  if (process.env.DATABASE_URL) {
+    console.log('✅ Using DATABASE_URL connection string');
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : false,
+    };
   }
-}
 
-// Create a function to resolve hostname to IPv4 for Supabase
-const resolveHostToIPv4 = async (hostname) => {
-  if (!isSupabase) return hostname;
+  // Otherwise, build config from individual variables
+  const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
+  const dbPort = parseInt(process.env.DB_PORT || (isSupabase ? '6543' : '5432'));
+  const dbHost = process.env.DB_HOST || 'localhost';
   
-  // Try multiple DNS resolution methods
-  try {
-    // Method 1: Try resolve4 (explicit IPv4 only)
-    try {
-      const addresses = await resolve4(hostname);
-      if (addresses && addresses.length > 0) {
-        const ipAddress = addresses[0];
-        console.log(`✅ Resolved ${hostname} to IPv4 using resolve4: ${ipAddress}`);
-        return ipAddress;
-      }
-    } catch (resolve4Error) {
-      console.warn(`⚠️  resolve4 failed: ${resolve4Error.message}`);
-    }
-    
-    // Method 2: Try lookup with family 4
-    try {
-      const result = await lookup(hostname, { family: 4 });
-      const ipAddress = typeof result === 'string' ? result : result.address;
-      console.log(`✅ Resolved ${hostname} to IPv4 using lookup: ${ipAddress}`);
-      return ipAddress;
-    } catch (lookupError) {
-      console.warn(`⚠️  lookup failed: ${lookupError.message}`);
-    }
-    
-    // Method 3: Try aws-0- prefix (sometimes works better)
-    if (hostname.startsWith('db.')) {
-      const awsHostname = hostname.replace('db.', 'aws-0-');
-      try {
-        const addresses = await resolve4(awsHostname);
-        if (addresses && addresses.length > 0) {
-          const ipAddress = addresses[0];
-          console.log(`✅ Resolved ${awsHostname} to IPv4: ${ipAddress}`);
-          return ipAddress;
-        }
-      } catch (awsError) {
-        console.warn(`⚠️  aws-0- resolution failed: ${awsError.message}`);
-      }
-    }
-    
-    throw new Error('All DNS resolution methods failed');
-  } catch (resolveError) {
-    console.warn(`⚠️  Could not resolve ${hostname} to IPv4, using hostname: ${resolveError.message}`);
-    // Continue with hostname - might work if DNS is configured correctly
-    return hostname;
-  }
-};
-
-// Create base config (will resolve IP in createConnection)
-const createDbConfig = (host) => {
-  const config = {
-    host: host,
+  // Build connection string (more reliable than config object for Supabase)
+  const connectionString = `postgresql://${process.env.DB_USER || 'postgres'}:${encodeURIComponent(process.env.DB_PASSWORD || 'postgres')}@${dbHost}:${dbPort}/${process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system')}`;
+  
+  console.log('📝 Using connection string format');
+  console.log('Database config:', {
+    host: dbHost,
     port: dbPort,
     database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    ssl: isSupabase ? 'enabled' : 'disabled',
+    hasPassword: !!process.env.DB_PASSWORD,
+  });
+
+  return {
+    connectionString,
     ssl: isSupabase ? { rejectUnauthorized: false } : false,
-    // Force IPv4 and add connection timeout
-    ...(isSupabase ? {
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-    } : {}),
+    connectionTimeoutMillis: isSupabase ? 10000 : 5000,
+    idleTimeoutMillis: isSupabase ? 30000 : 10000,
   };
-  
-  // For IPv4 addresses, ensure we're using the right family
-  // Check if host is an IP address (IPv4)
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Regex.test(host)) {
-    // Host is already an IP address, use it directly
-    console.log(`📌 Using direct IPv4 address: ${host}`);
-  }
-  
-  return config;
 };
 
-// Create pool with hostname initially (will be updated if IPv4 resolution succeeds)
-let pool = new Pool(createDbConfig(dbHost));
+// Create pool with the configuration
+const pool = new Pool(getDatabaseConfig());
 
-// Log connection details (for debugging, without password)
-console.log('Database config:', {
-  host: dbHost,
-  port: dbPort,
-  database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
-  user: process.env.DB_USER || 'postgres',
-  ssl: isSupabase ? 'enabled' : 'disabled',
-  hasPassword: !!process.env.DB_PASSWORD,
-  isSupabase: isSupabase,
-  usingPooler: dbPort === 6543,
-  dnsOrder: 'ipv4first'
+// Handle pool errors
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
 });
 
 export const query = async (text, params) => {
@@ -144,96 +65,43 @@ export const getClient = async () => {
 };
 
 export const createConnection = async () => {
-  let connectionAttempts = 0;
-  const maxAttempts = 3;
-  
-  while (connectionAttempts < maxAttempts) {
-    try {
-      connectionAttempts++;
-      
-      // For Supabase, try to resolve to IPv4 first
-      if (isSupabase && connectionAttempts === 1) {
-        try {
-          console.log(`🔍 Attempting to resolve ${dbHost} to IPv4...`);
-          const resolvedIP = await resolveHostToIPv4(dbHost);
-          if (resolvedIP !== dbHost) {
-            // Recreate pool with IPv4 address
-            try {
-              await pool.end();
-            } catch (e) {
-              // Ignore errors closing old pool
-            }
-            pool = new Pool(createDbConfig(resolvedIP));
-            console.log(`🔄 Recreated pool with IPv4 address: ${resolvedIP}`);
-          } else {
-            console.log(`⚠️  Could not resolve to IPv4, using hostname: ${dbHost}`);
-          }
-        } catch (resolveError) {
-          console.warn('⚠️  IPv4 resolution failed, continuing with hostname:', resolveError.message);
-        }
-      }
-      
-      // Try alternative hostname format if first attempt fails
-      if (isSupabase && connectionAttempts === 2 && dbHost.startsWith('db.')) {
-        const altHost = dbHost.replace('db.', 'aws-0-');
-        console.log(`🔄 Trying alternative hostname: ${altHost}`);
-        try {
-          await pool.end();
-        } catch (e) {
-          // Ignore errors
-        }
-        pool = new Pool(createDbConfig(altHost));
-      }
-      
-      const client = await pool.connect();
-      console.log('✅ Database connected successfully');
-      client.release();
-      await initializeTables();
-      return; // Success, exit the retry loop
-    } catch (error) {
+  try {
+    // Test connection
+    const client = await pool.connect();
+    console.log('✅ Database connected successfully');
+    
+    // Run a simple query to verify
+    await client.query('SELECT NOW()');
+    client.release();
+    
+    // Initialize tables
+    await initializeTables();
+    console.log('✅ Database tables initialized');
+  } catch (error) {
     console.error('❌ Database connection error:', error.message);
     console.error('Error code:', error.code);
-    console.error('\n⚠️  Database connection failed!');
+    console.error('\n⚠️  Database connection failed!\n');
     
-    // Provide helpful error messages based on error type
+    // Provide helpful error messages
     if (error.code === 'ENOTFOUND' || error.code === 'ENETUNREACH') {
       console.error('Possible causes:');
       console.error('  1. Supabase project is paused - check https://supabase.com/dashboard');
-      console.error('  2. Incorrect DB_HOST in environment variables');
+      console.error('  2. Incorrect DB_HOST or DATABASE_URL in environment variables');
       console.error('  3. Network/firewall blocking connection');
       console.error(`  Current DB_HOST: ${process.env.DB_HOST || 'not set'}`);
-      console.error('  4. IPv6 connectivity issue - try using IPv4 address directly');
-      
-      // If IPv6 error, suggest trying IPv4 resolution
-      if (error.message.includes('IPv6') || error.message.includes('::')) {
-        console.error('\n💡 Tip: The connection is trying to use IPv6. Trying IPv4 resolution...');
-        try {
-          const resolvedIP = await resolveHostToIPv4(dbHost);
-          if (resolvedIP !== dbHost) {
-            console.log(`   Resolved to IPv4: ${resolvedIP}`);
-            console.log('   You can set DB_HOST to this IP address in Render environment variables');
-          }
-        } catch (e) {
-          // Ignore resolution errors here
-        }
-      }
+      console.error(`  DATABASE_URL set: ${!!process.env.DATABASE_URL}`);
+      console.error('\n💡 Solution: Use DATABASE_URL connection string from Supabase dashboard');
+      console.error('   Go to: Supabase Dashboard → Settings → Database → Connection string');
+      console.error('   Copy the "Connection pooling" string and set it as DATABASE_URL in Render\n');
     } else if (error.code === 'ECONNREFUSED') {
       console.error('Connection refused - check DB_PORT and ensure database is accessible');
     } else if (error.code === '28P01') {
       console.error('Authentication failed - check DB_USER and DB_PASSWORD');
+    } else if (error.message.includes('password')) {
+      console.error('Password authentication failed - verify DB_PASSWORD is correct');
     }
     
-      // If this was the last attempt, give up
-      if (connectionAttempts >= maxAttempts) {
-        console.error('\nThe server will continue running but database operations will fail.');
-        console.error('Check your Render environment variables and Supabase project status.\n');
-        break;
-      } else {
-        console.log(`\n🔄 Retrying connection (attempt ${connectionAttempts + 1}/${maxAttempts})...\n`);
-        // Wait a bit before retrying
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
+    console.error('The server will continue running but database operations will fail.\n');
   }
 };
 
@@ -556,9 +424,6 @@ const initializeTables = async () => {
   await query(`CREATE INDEX IF NOT EXISTS idx_returns_date ON returns(date_time)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product ON stock_adjustments(product_id)`);
-
-  console.log('Database tables initialized');
 };
 
 export default pool;
-
