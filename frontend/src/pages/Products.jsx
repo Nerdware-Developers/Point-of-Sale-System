@@ -628,14 +628,25 @@ export default function Products() {
 
               {/* Stock Quantity */}
               <div>
-                <label className="block text-sm font-medium mb-1">Stock Quantity</label>
+                <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
                 <input
                   type="number"
                   value={formData.stock_quantity}
                   onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  placeholder="0 (optional)"
+                  placeholder="0"
+                  required
+                  min="0"
                 />
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Enter the number of <strong>sellable units</strong> you have in stock.
+                  <br />
+                  <span className="text-gray-600">
+                    Example: If you have a bale with 12 packets inside and you sell individual packets, enter <strong>12</strong>.
+                    <br />
+                    If you only sell the whole bale, enter <strong>1</strong>.
+                  </span>
+                </p>
               </div>
 
               <div className="flex gap-2 pt-4">
