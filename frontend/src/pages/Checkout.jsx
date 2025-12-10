@@ -16,9 +16,6 @@ export default function Checkout() {
   const [saleType, setSaleType] = useState('retail'); // 'retail' or 'wholesale'
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
-  const [cashGiven, setCashGiven] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [paymentMethods, setPaymentMethods] = useState([]);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -297,11 +294,6 @@ export default function Checkout() {
   const taxAmount = (subtotal * (parseFloat(tax) || 0)) / 100;
   const discountAmount = (subtotal * (parseFloat(discount) || 0)) / 100;
   const total = subtotal + taxAmount - discountAmount;
-  
-  // Calculate payment totals
-  const paymentTotal = (paymentMethods || []).reduce((sum, pm) => sum + parseFloat(pm?.amount || 0), 0);
-  const remaining = total - paymentTotal;
-  const change = paymentMethod === 'cash' && cashGiven ? parseFloat(cashGiven) - remaining : 0;
 
   const handleHoldTransaction = async () => {
     if (cart.length === 0) {
@@ -328,8 +320,6 @@ export default function Checkout() {
       setCart([]);
       setDiscount(0);
       setTax(0);
-      setPaymentMethods([]);
-      setCashGiven('');
       setSelectedCustomer(null);
       fetchHeldTransactions();
     } catch (error) {
@@ -370,18 +360,7 @@ export default function Checkout() {
       return;
     }
 
-    // Check payment methods (skip for credit sales)
-    if (!isCreditSale) {
-      if (paymentMethods.length > 0) {
-      if (paymentTotal < total) {
-        toast.error('Payment amount is less than total');
-        return;
-      }
-      } else if (paymentMethod === 'cash' && (!cashGiven || parseFloat(cashGiven) < total)) {
-        toast.error('Insufficient cash');
-        return;
-      }
-    }
+    // No payment validation needed
 
     try {
       const items = cart.map((item) => ({
@@ -394,23 +373,15 @@ export default function Checkout() {
         units_per_bulk: item.units_per_bulk || null,
       }));
 
-      // Prepare payment methods array
-      const finalPaymentMethods = paymentMethods.length > 0 
-        ? paymentMethods 
-        : [{ method: paymentMethod, amount: total }];
-
       const saleData = {
         items,
         subtotal,
         tax: taxAmount,
         discount: discountAmount,
         total_amount: total,
-        payment_method: paymentMethod,
-        payment_methods: finalPaymentMethods,
+        payment_method: 'cash', // Default to cash for now
         customer_id: selectedCustomer?.id || null,
         sale_type: saleType,
-        cash_given: paymentMethod === 'cash' ? parseFloat(cashGiven) : null,
-        change_returned: change > 0 ? change : null,
         sale_id: `SALE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         date_time: new Date().toISOString(),
       };
@@ -447,8 +418,6 @@ export default function Checkout() {
       setCart([]);
       setDiscount(0);
       setTax(0);
-      setPaymentMethods([]);
-      setCashGiven('');
       setIsCreditSale(false);
       setSelectedCustomer(null);
       setSearchQuery('');
@@ -465,17 +434,6 @@ export default function Checkout() {
     }
   };
 
-  const addPaymentMethod = () => {
-    if (paymentTotal >= total) {
-      toast.error('Payment already covers total');
-      return;
-    }
-    setPaymentMethods([...paymentMethods, { method: 'cash', amount: remaining > 0 ? remaining : 0 }]);
-  };
-
-  const removePaymentMethod = (index) => {
-    setPaymentMethods(paymentMethods.filter((_, i) => i !== index));
-  };
 
   const printReceipt = () => {
     window.print();
@@ -679,9 +637,9 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* Right: Payment Summary */}
+        {/* Right: Order Summary */}
         <div className="bg-white p-6 rounded-lg shadow-md h-fit sticky top-4">
-          <h2 className="text-2xl font-bold mb-4">Payment</h2>
+          <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
 
           <div className="space-y-4 mb-6">
             <div className="flex justify-between text-lg">
@@ -733,96 +691,6 @@ export default function Checkout() {
                 <span className="text-blue-600">{formatCurrency(total)}</span>
               </div>
             </div>
-          </div>
-
-          {/* Multiple Payment Methods */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium">Payment Methods</label>
-              <button
-                type="button"
-                onClick={addPaymentMethod}
-                className="text-xs text-blue-600 hover:text-blue-700"
-              >
-                + Add Payment
-              </button>
-            </div>
-            
-            {paymentMethods.length === 0 ? (
-              <div>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded mb-2"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="mobile">Mobile Payment</option>
-                </select>
-                {paymentMethod === 'cash' && (
-                  <div>
-                    <input
-                      type="number"
-                      value={cashGiven}
-                      onChange={(e) => setCashGiven(e.target.value)}
-                      placeholder="Cash given"
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-lg"
-                      step="0.01"
-                      min="0"
-                    />
-                    {change > 0 && (
-                      <p className="mt-2 text-green-600 font-semibold">Change: {formatCurrency(change)}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {paymentMethods.map((pm, index) => (
-                  <div key={index} className="flex gap-2">
-                    <select
-                      value={pm.method}
-                      onChange={(e) => {
-                        const newMethods = [...paymentMethods];
-                        newMethods[index].method = e.target.value;
-                        setPaymentMethods(newMethods);
-                      }}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="cash">Cash</option>
-                      <option value="card">Card</option>
-                      <option value="mobile">Mobile</option>
-                    </select>
-                    <input
-                      type="number"
-                      value={pm.amount}
-                      onChange={(e) => {
-                        const newMethods = [...paymentMethods];
-                        newMethods[index].amount = parseFloat(e.target.value) || 0;
-                        setPaymentMethods(newMethods);
-                      }}
-                      placeholder="Amount"
-                      className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                      step="0.01"
-                      min="0"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePaymentMethod(index)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                {paymentTotal < total && (
-                  <p className="text-sm text-red-600">Remaining: {formatCurrency(remaining)}</p>
-                )}
-                {paymentTotal > total && (
-                  <p className="text-sm text-green-600">Change: {formatCurrency(paymentTotal - total)}</p>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="flex gap-2">
@@ -892,16 +760,6 @@ export default function Checkout() {
                 <span>Total:</span>
                 <span>{formatCurrency(lastSale.total_amount)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Payment:</span>
-                <span className="capitalize">{lastSale.payment_method}</span>
-              </div>
-              {lastSale.change_returned > 0 && (
-                <div className="flex justify-between">
-                  <span>Change:</span>
-                  <span>{formatCurrency(lastSale.change_returned)}</span>
-                </div>
-              )}
             </div>
             <div className="flex gap-2">
               <button
