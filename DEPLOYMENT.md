@@ -23,13 +23,15 @@
    NODE_ENV=production
    PORT=5000
    DB_HOST=db.qnygngzfbvcsfhpttjmg.supabase.co
-   DB_PORT=5432
+   DB_PORT=6543
    DB_NAME=postgres
    DB_USER=postgres
    DB_PASSWORD=[your-supabase-password]
    JWT_SECRET=[generate-a-random-secret]
    JWT_EXPIRE=7d
    ```
+   
+   **Important:** Use port `6543` (connection pooler) for Supabase, not `5432`. The connection pooler is more reliable for serverless/server environments.
 6. Click "Create Web Service"
 7. Wait for deployment (5-10 minutes)
 8. Copy your backend URL (e.g., `https://pos-backend.onrender.com`)

@@ -37,7 +37,21 @@ export default function Categories() {
       setFormData({ name: '', description: '' });
       fetchCategories();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Operation failed');
+      console.error('Category operation error:', error);
+      const errorMessage = error.response?.data?.error 
+        || error.response?.data?.message 
+        || error.message 
+        || 'Operation failed';
+      const errorDetails = error.response?.data?.details 
+        ? ` Details: ${error.response.data.details}` 
+        : '';
+      toast.error(`${errorMessage}${errorDetails}`);
+      
+      // Log full error for debugging
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
     }
   };
 
