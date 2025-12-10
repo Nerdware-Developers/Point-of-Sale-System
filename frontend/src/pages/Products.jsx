@@ -71,50 +71,46 @@ export default function Products() {
     e.preventDefault();
 
     try {
-      // Validate required fields
+      // Validate required fields - only name is required
       if (!formData.name || !formData.name.trim()) {
         toast.error('Product name is required');
         return;
       }
       
-      const buyingPrice = parseFloat(formData.buying_price);
-      const sellingPrice = parseFloat(formData.selling_price);
-      const wholesalePrice = parseFloat(formData.wholesale_price);
-      const stockQuantity = parseInt(formData.stock_quantity);
+      const buyingPrice = formData.buying_price ? parseFloat(formData.buying_price) : null;
+      const sellingPrice = formData.selling_price ? parseFloat(formData.selling_price) : null;
+      const wholesalePrice = formData.wholesale_price ? parseFloat(formData.wholesale_price) : null;
+      const stockQuantity = formData.stock_quantity ? parseInt(formData.stock_quantity) : 0;
 
-      if (isNaN(buyingPrice) || buyingPrice < 0) {
-        toast.error('Valid buying price is required');
+      // Validate prices only if provided
+      if (formData.buying_price && (isNaN(buyingPrice) || buyingPrice < 0)) {
+        toast.error('If provided, buying price must be a valid positive number');
         return;
       }
 
-      if (isNaN(sellingPrice) || sellingPrice < 0) {
-        toast.error('Valid retail selling price is required');
+      if (formData.selling_price && (isNaN(sellingPrice) || sellingPrice < 0)) {
+        toast.error('If provided, retail selling price must be a valid positive number');
         return;
       }
 
-      // Validate wholesale price is required
-      if (!formData.wholesale_price || isNaN(wholesalePrice) || wholesalePrice < 0) {
-        toast.error('Valid wholesale selling price is required');
+      // Validate wholesale price only if provided
+      if (formData.wholesale_price && (isNaN(wholesalePrice) || wholesalePrice < 0)) {
+        toast.error('If provided, wholesale price must be a valid positive number');
         return;
       }
 
-      if (isNaN(stockQuantity) || stockQuantity < 0) {
-        toast.error('Valid stock quantity is required');
-        return;
-      }
-
-      // Validate image is required
-      if (!formData.image_url) {
-        toast.error('Please take or upload a product photo');
+      // Validate stock quantity only if provided
+      if (formData.stock_quantity && (isNaN(stockQuantity) || stockQuantity < 0)) {
+        toast.error('If provided, stock quantity must be a valid positive number');
         return;
       }
 
       // Prepare data with proper types and handle empty strings
       const submitData = {
         name: formData.name.trim(),
-        buying_price: buyingPrice,
-        selling_price: sellingPrice,
-        wholesale_price: wholesalePrice,
+        buying_price: buyingPrice || 0,
+        selling_price: sellingPrice || 0,
+        wholesale_price: wholesalePrice || null,
         stock_quantity: stockQuantity,
         category_id: formData.category_id || null,
         supplier_id: null, // Removed supplier
@@ -492,7 +488,7 @@ export default function Products() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Product Image - Prominent */}
               <div>
-                <label className="block text-sm font-medium mb-2">Product Photo *</label>
+                <label className="block text-sm font-medium mb-2">Product Photo</label>
                 {formData.image_url ? (
                   <div className="space-y-3">
                     <div className="relative inline-block">
@@ -596,53 +592,49 @@ export default function Products() {
               {/* Prices */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Buying Price *</label>
+                  <label className="block text-sm font-medium mb-1">Buying Price</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.buying_price}
                     onChange={(e) => setFormData({ ...formData, buying_price: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    placeholder="0.00"
-                    required
+                    placeholder="0.00 (optional)"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Retail Price *</label>
+                  <label className="block text-sm font-medium mb-1">Retail Price</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    placeholder="0.00"
-                    required
+                    placeholder="0.00 (optional)"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Wholesale Price *</label>
+                  <label className="block text-sm font-medium mb-1">Wholesale Price</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.wholesale_price}
                     onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    placeholder="0.00"
-                    required
+                    placeholder="0.00 (optional)"
                   />
                 </div>
               </div>
 
               {/* Stock Quantity */}
               <div>
-                <label className="block text-sm font-medium mb-1">Stock Quantity *</label>
+                <label className="block text-sm font-medium mb-1">Stock Quantity</label>
                 <input
                   type="number"
                   value={formData.stock_quantity}
                   onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  placeholder="0"
-                  required
+                  placeholder="0 (optional)"
                 />
               </div>
 
