@@ -243,12 +243,18 @@ class _ProductTile extends StatelessWidget {
             if (cartItem.quantity > 0) ...[
               IconButton(
                 icon: const Icon(Icons.remove),
-                onPressed: () => saleProvider.updateQuantity(product.id, cartItem.quantity - 1),
+                onPressed: () {
+                  final productProvider = Provider.of<ProductProvider>(context, listen: false);
+                  saleProvider.updateQuantity(product.id, cartItem.quantity - 1, productProvider);
+                },
               ),
               Text('${cartItem.quantity}'),
               IconButton(
                 icon: const Icon(Icons.add),
-                onPressed: () => saleProvider.updateQuantity(product.id, cartItem.quantity + 1),
+                onPressed: () {
+                  final productProvider = Provider.of<ProductProvider>(context, listen: false);
+                  saleProvider.updateQuantity(product.id, cartItem.quantity + 1, productProvider);
+                },
               ),
             ] else
               IconButton(

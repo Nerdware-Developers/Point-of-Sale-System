@@ -4,6 +4,7 @@ import '../models/sale_model.dart';
 import '../models/product_model.dart';
 import '../services/firebase_service.dart';
 import 'package:uuid/uuid.dart';
+import 'product_provider.dart';
 
 class SaleProvider with ChangeNotifier {
   List<SaleItem> _cart = [];
@@ -86,14 +87,20 @@ class SaleProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void updateQuantity(String productId, int quantity) {
+  void updateQuantity(String productId, int quantity, ProductProvider? productProvider) {
     final index = _cart.indexWhere((item) => item.productId == productId);
     if (index >= 0) {
       if (quantity <= 0) {
         _cart.removeAt(index);
       } else {
         final item = _cart[index];
-        // Check stock - you'd need to get product from provider
+        // Check stock if product provider is available
+        if (productProvider != null) {
+          final product = productProvider.getProductById(productId);
+          if (product != null && quantity > product.stockQuantity) {
+            return; // Insufficient stock
+          }
+        }
         _cart[index] = SaleItem(
           productId: item.productId,
           productName: item.productName,
