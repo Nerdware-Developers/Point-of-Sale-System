@@ -10,6 +10,7 @@ dns.setDefaultResultOrder('ipv4first');
 
 const { Pool } = pkg;
 const lookup = promisify(dns.lookup);
+const resolve4 = promisify(dns.resolve4);
 
 // For Supabase, use connection pooler (port 6543) which is more reliable
 const isSupabase = process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co');
@@ -39,11 +40,46 @@ if (isSupabase && !dbHost.startsWith('db.') && !dbHost.startsWith('aws-0-')) {
 const resolveHostToIPv4 = async (hostname) => {
   if (!isSupabase) return hostname;
   
+  // Try multiple DNS resolution methods
   try {
-    const result = await lookup(hostname, { family: 4 });
-    const ipAddress = typeof result === 'string' ? result : result.address;
-    console.log(`✅ Resolved ${hostname} to IPv4: ${ipAddress}`);
-    return ipAddress;
+    // Method 1: Try resolve4 (explicit IPv4 only)
+    try {
+      const addresses = await resolve4(hostname);
+      if (addresses && addresses.length > 0) {
+        const ipAddress = addresses[0];
+        console.log(`✅ Resolved ${hostname} to IPv4 using resolve4: ${ipAddress}`);
+        return ipAddress;
+      }
+    } catch (resolve4Error) {
+      console.warn(`⚠️  resolve4 failed: ${resolve4Error.message}`);
+    }
+    
+    // Method 2: Try lookup with family 4
+    try {
+      const result = await lookup(hostname, { family: 4 });
+      const ipAddress = typeof result === 'string' ? result : result.address;
+      console.log(`✅ Resolved ${hostname} to IPv4 using lookup: ${ipAddress}`);
+      return ipAddress;
+    } catch (lookupError) {
+      console.warn(`⚠️  lookup failed: ${lookupError.message}`);
+    }
+    
+    // Method 3: Try aws-0- prefix (sometimes works better)
+    if (hostname.startsWith('db.')) {
+      const awsHostname = hostname.replace('db.', 'aws-0-');
+      try {
+        const addresses = await resolve4(awsHostname);
+        if (addresses && addresses.length > 0) {
+          const ipAddress = addresses[0];
+          console.log(`✅ Resolved ${awsHostname} to IPv4: ${ipAddress}`);
+          return ipAddress;
+        }
+      } catch (awsError) {
+        console.warn(`⚠️  aws-0- resolution failed: ${awsError.message}`);
+      }
+    }
+    
+    throw new Error('All DNS resolution methods failed');
   } catch (resolveError) {
     console.warn(`⚠️  Could not resolve ${hostname} to IPv4, using hostname: ${resolveError.message}`);
     // Continue with hostname - might work if DNS is configured correctly
@@ -52,19 +88,31 @@ const resolveHostToIPv4 = async (hostname) => {
 };
 
 // Create base config (will resolve IP in createConnection)
-const createDbConfig = (host) => ({
-  host: host,
-  port: dbPort,
-  database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  ssl: isSupabase ? { rejectUnauthorized: false } : false,
-  // Force IPv4 and add connection timeout
-  ...(isSupabase ? {
-    connectionTimeoutMillis: 10000,
-    idleTimeoutMillis: 30000,
-  } : {}),
-});
+const createDbConfig = (host) => {
+  const config = {
+    host: host,
+    port: dbPort,
+    database: process.env.DB_NAME || (isSupabase ? 'postgres' : 'pos_system'),
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    ssl: isSupabase ? { rejectUnauthorized: false } : false,
+    // Force IPv4 and add connection timeout
+    ...(isSupabase ? {
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+    } : {}),
+  };
+  
+  // For IPv4 addresses, ensure we're using the right family
+  // Check if host is an IP address (IPv4)
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Regex.test(host)) {
+    // Host is already an IP address, use it directly
+    console.log(`📌 Using direct IPv4 address: ${host}`);
+  }
+  
+  return config;
+};
 
 // Create pool with hostname initially (will be updated if IPv4 resolution succeeds)
 let pool = new Pool(createDbConfig(dbHost));
@@ -96,27 +144,53 @@ export const getClient = async () => {
 };
 
 export const createConnection = async () => {
-  try {
-    // For Supabase, try to resolve to IPv4 first
-    if (isSupabase) {
-      try {
-        const resolvedIP = await resolveHostToIPv4(dbHost);
-        if (resolvedIP !== dbHost) {
-          // Recreate pool with IPv4 address
-          pool.end(); // Close old pool
-          pool = new Pool(createDbConfig(resolvedIP));
-          console.log(`🔄 Recreated pool with IPv4 address: ${resolvedIP}`);
+  let connectionAttempts = 0;
+  const maxAttempts = 3;
+  
+  while (connectionAttempts < maxAttempts) {
+    try {
+      connectionAttempts++;
+      
+      // For Supabase, try to resolve to IPv4 first
+      if (isSupabase && connectionAttempts === 1) {
+        try {
+          console.log(`🔍 Attempting to resolve ${dbHost} to IPv4...`);
+          const resolvedIP = await resolveHostToIPv4(dbHost);
+          if (resolvedIP !== dbHost) {
+            // Recreate pool with IPv4 address
+            try {
+              await pool.end();
+            } catch (e) {
+              // Ignore errors closing old pool
+            }
+            pool = new Pool(createDbConfig(resolvedIP));
+            console.log(`🔄 Recreated pool with IPv4 address: ${resolvedIP}`);
+          } else {
+            console.log(`⚠️  Could not resolve to IPv4, using hostname: ${dbHost}`);
+          }
+        } catch (resolveError) {
+          console.warn('⚠️  IPv4 resolution failed, continuing with hostname:', resolveError.message);
         }
-      } catch (resolveError) {
-        console.warn('⚠️  IPv4 resolution failed, continuing with hostname');
       }
-    }
-    
-    const client = await pool.connect();
-    console.log('✅ Database connected successfully');
-    client.release();
-    await initializeTables();
-  } catch (error) {
+      
+      // Try alternative hostname format if first attempt fails
+      if (isSupabase && connectionAttempts === 2 && dbHost.startsWith('db.')) {
+        const altHost = dbHost.replace('db.', 'aws-0-');
+        console.log(`🔄 Trying alternative hostname: ${altHost}`);
+        try {
+          await pool.end();
+        } catch (e) {
+          // Ignore errors
+        }
+        pool = new Pool(createDbConfig(altHost));
+      }
+      
+      const client = await pool.connect();
+      console.log('✅ Database connected successfully');
+      client.release();
+      await initializeTables();
+      return; // Success, exit the retry loop
+    } catch (error) {
     console.error('❌ Database connection error:', error.message);
     console.error('Error code:', error.code);
     console.error('\n⚠️  Database connection failed!');
@@ -149,8 +223,17 @@ export const createConnection = async () => {
       console.error('Authentication failed - check DB_USER and DB_PASSWORD');
     }
     
-    console.error('\nThe server will continue running but database operations will fail.');
-    console.error('Check your Render environment variables and Supabase project status.\n');
+      // If this was the last attempt, give up
+      if (connectionAttempts >= maxAttempts) {
+        console.error('\nThe server will continue running but database operations will fail.');
+        console.error('Check your Render environment variables and Supabase project status.\n');
+        break;
+      } else {
+        console.log(`\n🔄 Retrying connection (attempt ${connectionAttempts + 1}/${maxAttempts})...\n`);
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
   }
 };
 
