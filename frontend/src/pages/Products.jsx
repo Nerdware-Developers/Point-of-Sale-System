@@ -488,7 +488,7 @@ export default function Products() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Product Image - Prominent */}
               <div>
-                <label className="block text-sm font-medium mb-2">Product Photo</label>
+                <label className="block text-sm font-medium mb-2">Product Photo (Optional)</label>
                 {formData.image_url ? (
                   <div className="space-y-3">
                     <div className="relative inline-block">
